@@ -1,0 +1,5 @@
+train: C:\Users\user\Documents\Code\Yolov11_InsSeg\Train
+val: C:\Users\user\Documents\Code\Yolov11_InsSeg\Val
+
+nc: 1
+names: ["Black-faced spoonbill"]

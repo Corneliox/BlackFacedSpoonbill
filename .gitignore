@@ -1,0 +1,3 @@
+Yolov11_InsSeg/FinalExe/*
+Yolov11_InsSeg/dist/PredictBest/_internal/*
+*.zip
