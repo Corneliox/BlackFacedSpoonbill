@@ -57,12 +57,24 @@ BlackFacedSpoonbill/
 │   ├── samManual.py           # GUI anotasi / segmentasi interaktif berbasis SAM
 │   └── dataset_yolo_v11/      # Dataset anotasi yang dihasilkan modul SAM
 │
-└── SAHI/                      # [Modul 3] Sliced Aided Hyper Inference V1
-    ├── sahi_tiled_engine.py   # Core sliding window slicer & coordinate stitcher
-    ├── run_pipeline.py        # Skrip batch processing folder dataset
-    ├── gui_app.py             # Antarmuka desktop interaktif V1
-    ├── requirements.txt       # Daftar dependensi pustaka
-    └── runs/sahi_results/     # Output visualisasi inferensi ubin
+├── SAHI/                      # [Modul 3] Sliced Aided Hyper Inference V1
+│   ├── sahi_tiled_engine.py   # Engine inferensi ubin jendela geser V1
+│   └── gui_app.py             # GUI Studio V1
+│
+└── App/                       # [Modul 4] Spoonbill Studio Universal V3 (Lean, Desktop & Web Cross-Platform)
+    ├── Install_Desktop_App.bat    # 1-Click Installer untuk Desktop Windows
+    ├── Install_Mac_App.command    # 1-Click Installer untuk Desktop macOS (Intel & Apple Silicon)
+    ├── start_windows.bat          # Launcher 1-klik Windows
+    ├── start_mac.command          # Launcher 1-klik macOS
+    ├── desktop_app.py             # Dedicated Native Desktop Application Window (Edge/WebKit)
+    ├── app.py                     # FastAPI Backend Server ultra-ringan
+    ├── engine_onnx.py             # Pure ONNX Runtime Sliced Inference Engine (<60 MB total)
+    ├── requirements_lean.txt      # Dependensi minimal tanpa PyTorch/CUDA bloat
+    ├── GITHUB_RELEASE_GUIDE.md    # Panduan rilis GitHub & instalasi bagi klien
+    ├── models/                    # Model ONNX Presisi Standar Penuh (Non-Quantized)
+    │   ├── best_spoonbill_11l.onnx # Model Large (105.6 MB)
+    │   └── best_spoonbill_11n.onnx # Model Nano (11.1 MB)
+    └── static/                    # Frontend Web Studio (Single & Batch Census Mode)
 ```
 
 ---

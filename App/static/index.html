@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spoonbill AI Studio - Universal Lean Edition</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- MAIN APP CONTAINER -->
+  <div class="app-container">
+
+    <!-- HEADER NAVIGATION -->
+    <header class="app-header">
+      <div class="brand-group">
+        <div class="brand-icon">🦤</div>
+        <div class="brand-info">
+          <h1>Spoonbill Studio <span class="badge-tag">Universal V3</span></h1>
+          <p class="subtitle">Black-faced Spoonbill AI Instance Segmentation & Automated Census Platform</p>
+        </div>
+      </div>
+
+      <!-- WORKSPACE MODE SWITCHER TABS -->
+      <div class="mode-tabs">
+        <button class="tab-btn active" id="tab-single" data-tab="single">🖼️ Single Image Studio</button>
+        <button class="tab-btn" id="tab-batch" data-tab="batch">📂 Batch Census (Multi-Upload)</button>
+      </div>
+
+      <div class="header-status">
+        <div class="status-chip" id="chip-platform">
+          <span class="dot-live"></span>
+          <span id="platform-text">Universal (Win/Mac/Linux)</span>
+        </div>
+        <div class="status-chip highlight" id="chip-counter">
+          <span class="counter-label">Detected:</span>
+          <span class="counter-val" id="header-bird-count">0 Birds</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- MAIN WORKSPACE -->
+    <div class="workspace-grid">
+
+      <!-- LEFT SIDEBAR: CONTROLS & HYPERPARAMETERS -->
+      <aside class="sidebar-panel">
+
+        <!-- 1. MODEL SELECTION -->
+        <div class="panel-section">
+          <div class="section-title">
+            <span class="section-icon">🧠</span>
+            <h3>AI Model Selection</h3>
+          </div>
+          <div class="model-cards">
+            <label class="model-card active" id="card-11l">
+              <input type="radio" name="model_choice" value="11l" checked>
+              <div class="model-meta">
+                <span class="model-name">YOLO11 Large (11L)</span>
+                <span class="model-desc">27.6M Params • High Precision & Small Birds</span>
+              </div>
+            </label>
+            <label class="model-card" id="card-11n">
+              <input type="radio" name="model_choice" value="11n">
+              <div class="model-meta">
+                <span class="model-name">YOLO11 Nano (11N)</span>
+                <span class="model-desc">2.8M Params • Ultra Fast & Low Memory</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- 2. INFERENCE MODE TOGGLE -->
+        <div class="panel-section">
+          <div class="section-title">
+            <span class="section-icon">⚡</span>
+            <h3>Inference Mode</h3>
+            <button class="help-btn" data-tooltip="mode-tooltip">?</button>
+          </div>
+          <div class="tooltip-box" id="mode-tooltip">
+            <strong>Mode Inferensi:</strong><br>
+            • <b>SAHI Tiling (Aktif)</b>: Memotong gambar resolusi tinggi menjadi ubin kecil ber-overlap. Sangat direkomendasikan untuk panorama dan burung kecil di kejauhan.<br>
+            • <b>Direct (Nonaktif)</b>: Menjalankan 1 kali inferensi langsung pada gambar utuh. Sangat cepat (&lt;50 ms) untuk foto burung jarak dekat.
+          </div>
+          
+          <div class="toggle-row">
+            <label class="switch-label">
+              <input type="checkbox" id="toggle-sahi" checked>
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-text" id="toggle-sahi-text">Enable SAHI Tiling (Sliced Window)</span>
+          </div>
+        </div>
+
+        <!-- 3. HYPERPARAMETER TUNING (DUAL INPUTS + HELP ICONS) -->
+        <div class="panel-section" id="hyperparams-section">
+          <div class="section-title">
+            <span class="section-icon">⚙️</span>
+            <h3>Hyperparameters Tuning</h3>
+          </div>
+
+          <!-- A. TILE SIZE -->
+          <div class="param-row" id="row-tile-size">
+            <div class="param-header">
+              <label for="slider-tile">Tile Size (px)</label>
+              <button class="help-btn" data-tooltip="tile-tooltip">?</button>
+              <div class="tooltip-box" id="tile-tooltip">
+                <strong>Tile Size:</strong> Ukuran ubin jendela geser (320-1280 px). Menjaga ketajaman tekstur paruh burung tanpa pecah akibat downsampling.
+              </div>
+              <input type="number" id="input-tile" min="320" max="1280" step="32" value="640" class="numeric-input">
+            </div>
+            <input type="range" id="slider-tile" min="320" max="1280" step="32" value="640" class="range-slider">
+          </div>
+
+          <!-- B. OVERLAP RATIO -->
+          <div class="param-row" id="row-overlap">
+            <div class="param-header">
+              <label for="slider-overlap">Overlap Ratio</label>
+              <button class="help-btn" data-tooltip="overlap-tooltip">?</button>
+              <div class="tooltip-box" id="overlap-tooltip">
+                <strong>Overlap Ratio:</strong> Persentase irisan antar-ubin tetangga (0-50%). Mencegah burung di garis potong ubin terlewat.
+              </div>
+              <input type="number" id="input-overlap" min="0.0" max="0.50" step="0.05" value="0.20" class="numeric-input">
+            </div>
+            <input type="range" id="slider-overlap" min="0" max="50" step="5" value="20" class="range-slider">
+          </div>
+
+          <!-- C. CONFIDENCE THRESHOLD -->
+          <div class="param-row">
+            <div class="param-header">
+              <label for="slider-conf">Confidence</label>
+              <button class="help-btn" data-tooltip="conf-tooltip">?</button>
+              <div class="tooltip-box" id="conf-tooltip">
+                <strong>Confidence:</strong> Batas ambang kepastian minimum AI untuk menerima objek sebagai Burung Sendok Muka Hitam.
+              </div>
+              <input type="number" id="input-conf" min="0.05" max="0.95" step="0.05" value="0.25" class="numeric-input">
+            </div>
+            <input type="range" id="slider-conf" min="5" max="95" step="5" value="25" class="range-slider">
+          </div>
+
+          <!-- D. NMS IoU THRESHOLD -->
+          <div class="param-row">
+            <div class="param-header">
+              <label for="slider-iou">NMS IoU</label>
+              <button class="help-btn" data-tooltip="iou-tooltip">?</button>
+              <div class="tooltip-box" id="iou-tooltip">
+                <strong>NMS IoU:</strong> Batas tumpang-tindih (Intersection-over-Union) untuk menghapus deteksi ganda (Global NMS).
+              </div>
+              <input type="number" id="input-iou" min="0.10" max="0.90" step="0.05" value="0.45" class="numeric-input">
+            </div>
+            <input type="range" id="slider-iou" min="10" max="90" step="5" value="45" class="range-slider">
+          </div>
+
+        </div>
+
+        <!-- 4. LAYER TOGGLES (SINGLE MODE ONLY) -->
+        <div class="panel-section" id="layers-section">
+          <div class="section-title">
+            <span class="section-icon">👁️</span>
+            <h3>Display Layers</h3>
+          </div>
+          <div class="layers-grid">
+            <label class="checkbox-tag"><input type="checkbox" id="layer-masks" checked> <span>Polygon Masks</span></label>
+            <label class="checkbox-tag"><input type="checkbox" id="layer-boxes" checked> <span>Bounding Boxes</span></label>
+            <label class="checkbox-tag"><input type="checkbox" id="layer-labels" checked> <span>Tags & Scores</span></label>
+          </div>
+        </div>
+
+        <!-- 5. ACTION BUTTONS -->
+        <div class="action-section">
+          <button class="btn-primary" id="btn-run-inference">
+            <span class="btn-icon">▶</span>
+            <span id="btn-run-text">Run SAHI V3 Analysis</span>
+          </button>
+        </div>
+
+      </aside>
+
+      <!-- RIGHT MAIN AREA: (TAB 1: SINGLE IMAGE STUDIO) -->
+      <main class="main-content tab-view active" id="view-single">
+
+        <!-- TOOLBAR -->
+        <div class="canvas-toolbar">
+          <div class="upload-actions">
+            <label class="btn-secondary file-upload-btn">
+              <input type="file" id="file-input" accept="image/*">
+              <span>📁 Open Image</span>
+            </label>
+            <span class="file-name-display" id="file-name-display">No image selected</span>
+          </div>
+
+          <div class="zoom-controls">
+            <button class="btn-icon-tool" id="btn-zoom-in" title="Zoom In">➕</button>
+            <button class="btn-icon-tool" id="btn-zoom-out" title="Zoom Out">➖</button>
+            <button class="btn-icon-tool" id="btn-fit-screen" title="Fit to Canvas">🔲 Fit</button>
+            <button class="btn-icon-tool" id="btn-reset-zoom" title="Reset (100%)">1:1</button>
+          </div>
+
+          <div class="export-actions">
+            <button class="btn-secondary" id="btn-download-img" disabled>💾 Save Image</button>
+            <button class="btn-secondary" id="btn-export-csv" disabled>📊 Export CSV</button>
+          </div>
+        </div>
+
+        <!-- INTERACTIVE CANVAS WORKSPACE -->
+        <div class="canvas-wrapper" id="canvas-container">
+          <div class="drag-drop-overlay" id="drag-drop-overlay">
+            <div class="drop-msg">
+              <span class="drop-icon">📥</span>
+              <p>Drag & Drop high-resolution image here</p>
+              <span class="drop-sub">Supports JPG, PNG, WEBP, BMP</span>
+            </div>
+          </div>
+
+          <div class="loading-overlay" id="loading-overlay">
+            <div class="spinner"></div>
+            <p id="loading-text">Executing ONNX inference...</p>
+          </div>
+
+          <canvas id="main-canvas"></canvas>
+        </div>
+
+        <!-- BOTTOM METRICS & INSPECTOR TABS -->
+        <div class="bottom-inspector">
+          <div class="inspector-header">
+            <h4>📋 Detected Instances Inspector</h4>
+            <div class="hud-stats" id="hud-stats-bar">
+              <span class="stat-pill" id="stat-mode">Mode: -</span>
+              <span class="stat-pill" id="stat-time">Latency: - ms</span>
+              <span class="stat-pill" id="stat-slices">Slices: -</span>
+              <span class="stat-pill" id="stat-res">Resolution: -</span>
+            </div>
+          </div>
+
+          <div class="table-scroll-container">
+            <table class="instances-table" id="instances-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Class</th>
+                  <th>Confidence</th>
+                  <th>Bounding Box (x1, y1, x2, y2)</th>
+                  <th>Area (px²)</th>
+                </tr>
+              </thead>
+              <tbody id="table-body">
+                <tr class="empty-row">
+                  <td colspan="5">Upload an image and run inference to see detected spoonbills.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </main>
+
+      <!-- RIGHT MAIN AREA: (TAB 2: BATCH CENSUS MODE) -->
+      <main class="main-content tab-view" id="view-batch">
+        <div class="batch-container">
+          
+          <!-- BATCH HEADER & UPLOAD -->
+          <div class="batch-upload-hero">
+            <div class="batch-hero-content">
+              <h2>📂 Batch Population Census & Multi-Image Auto-Save</h2>
+              <p>Upload puluhan/ratusan foto sekaligus. Sistem akan otomatis memproses, menghitung jumlah burung sendok per gambar, menyimpan seluruh gambar beranotasi, dan menghasilkan rekapitulasi data lengkap.</p>
+              
+              <div class="batch-upload-btn-group">
+                <label class="btn-primary-large file-upload-btn">
+                  <input type="file" id="batch-file-input" accept="image/*" multiple>
+                  <span>📁 Select Multiple Images / Folder</span>
+                </label>
+                <button class="btn-primary-large action-run" id="btn-start-batch" disabled>
+                  <span>▶ Start Batch Processing</span>
+                </button>
+              </div>
+              <span class="batch-file-count" id="batch-selected-count">0 images selected in queue</span>
+            </div>
+          </div>
+
+          <!-- BATCH PROGRESS & SUMMARY CARDS -->
+          <div class="batch-summary-cards" id="batch-summary-cards" style="display:none;">
+            <div class="summary-card">
+              <span class="summary-label">Total Images</span>
+              <span class="summary-value" id="batch-card-total-imgs">0</span>
+            </div>
+            <div class="summary-card highlight-green">
+              <span class="summary-label">Total Spoonbills Counted</span>
+              <span class="summary-value" id="batch-card-total-birds">0</span>
+            </div>
+            <div class="summary-card">
+              <span class="summary-label">Average Time per Image</span>
+              <span class="summary-value" id="batch-card-avg-time">0 ms</span>
+            </div>
+          </div>
+
+          <!-- BATCH ACTIONS TOOLBAR -->
+          <div class="batch-export-toolbar" id="batch-export-toolbar" style="display:none;">
+            <h3>📊 Batch Results Summary</h3>
+            <div class="export-btn-group">
+              <button class="btn-secondary" id="btn-batch-download-csv">💾 Download Census Summary (CSV)</button>
+              <button class="btn-primary" id="btn-batch-download-zip">📦 Download All Annotated Images (ZIP)</button>
+            </div>
+          </div>
+
+          <!-- BATCH RESULTS TABLE -->
+          <div class="batch-table-container">
+            <table class="instances-table" id="batch-results-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Image Filename</th>
+                  <th>Resolution</th>
+                  <th>Spoonbill Count</th>
+                  <th>Inference Mode</th>
+                  <th>Slices</th>
+                  <th>Latency</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="batch-table-body">
+                <tr class="empty-row">
+                  <td colspan="8">Pilih atau unggah beberapa gambar di atas untuk memulai sensus batch otomatis.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+        </div>
+      </main>
+
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
