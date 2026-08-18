@@ -60,8 +60,30 @@ class SpoonbillOnnxEngine:
         }
         fname = filename_map.get(model_type, "best_spoonbill_11l.onnx")
 
-        # Auto-extract from .zip if needed
+        # 1. Auto-reconstruct from multipart chunks (.part1, .part2, ...)
         for d in [self.models_dir, os.path.join(self.base_dir, "models"), self.base_dir]:
+            if not os.path.isdir(d):
+                continue
+            target_p = os.path.join(d, fname)
+            part1_p = os.path.join(d, f"{fname}.part1")
+            if not os.path.exists(target_p) and os.path.exists(part1_p):
+                print(f"[ONNX Engine] Reconstructing {fname} from binary parts...")
+                parts = sorted(
+                    [os.path.join(d, f) for f in os.listdir(d) if f.startswith(f"{fname}.part")],
+                    key=lambda x: int(x.split(".part")[-1]) if x.split(".part")[-1].isdigit() else 0
+                )
+                with open(target_p, "wb") as outfile:
+                    for part_f in parts:
+                        with open(part_f, "rb") as infile:
+                            outfile.write(infile.read())
+                if os.path.exists(target_p):
+                    print(f"[ONNX Engine] {fname} successfully reconstructed ({os.path.getsize(target_p):,} bytes).")
+                    return target_p
+
+        # 2. Auto-extract from .zip if needed
+        for d in [self.models_dir, os.path.join(self.base_dir, "models"), self.base_dir]:
+            if not os.path.isdir(d):
+                continue
             target_p = os.path.join(d, fname)
             zip_p = target_p + ".zip"
             if not os.path.exists(target_p) and os.path.exists(zip_p):
