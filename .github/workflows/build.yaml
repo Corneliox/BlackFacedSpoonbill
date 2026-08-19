@@ -19,13 +19,13 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            platform_name: Windows x64 (.exe)
+            platform_name: Windows x64 (Direct .EXE & ZIP)
           - os: macos-15-intel
-            platform_name: macOS Intel x64 (.dmg)
+            platform_name: macOS Intel x64 (.DMG)
           - os: macos-14
-            platform_name: macOS Apple Silicon arm64 (.dmg)
+            platform_name: macOS Apple Silicon arm64 (.DMG)
           - os: ubuntu-latest
-            platform_name: Universal Portable (.zip)
+            platform_name: Linux x64 & Universal (Installer & ZIP)
 
     name: Build on ${{ matrix.platform_name }}
     runs-on: ${{ matrix.os }}
@@ -62,14 +62,19 @@ jobs:
           cd App
           python -c "from engine_onnx import SpoonbillOnnxEngine; e = SpoonbillOnnxEngine('11l'); SpoonbillOnnxEngine('11n')"
 
-      # ── Build Windows Executable ─────────────────────────────────────────────
-      - name: Build Windows Executable (.exe)
+      # ── Build Windows (Ready-to-run .EXE and Portable ZIP) ────────────────────
+      - name: Build Windows Standalone .EXE and Portable ZIP
         if: runner.os == 'Windows'
         run: |
           cd App
-          pyinstaller --noconfirm --onedir --windowed --name "Spoonbill_AI_Studio" --add-data "static;static" --add-data "models;models" desktop_app.py
           mkdir dist_release
-          Compress-Archive -Path "dist/Spoonbill_AI_Studio/*" -DestinationPath "dist_release/Spoonbill_AI_Studio_Windows_x64.zip" -Force
+          # 1. Build Standalone 1-File Executable (.exe ready to run)
+          pyinstaller --noconfirm --onefile --windowed --name "Spoonbill_AI_Studio_v3.0.1_Windows_x64" --add-data "static;static" --add-data "models;models" desktop_app.py
+          Move-Item "dist/Spoonbill_AI_Studio_v3.0.1_Windows_x64.exe" "dist_release/" -Force
+
+          # 2. Build Onedir Folder & ZIP
+          pyinstaller --noconfirm --onedir --windowed --name "Spoonbill_AI_Studio" --add-data "static;static" --add-data "models;models" desktop_app.py
+          Compress-Archive -Path "dist/Spoonbill_AI_Studio/*" -DestinationPath "dist_release/Spoonbill_AI_Studio_v3.0.1_Windows_x64_Portable.zip" -Force
 
       # ── Build macOS Intel .DMG ───────────────────────────────────────────────
       - name: Build macOS Intel .DMG
@@ -81,7 +86,7 @@ jobs:
           mkdir -p dmg_tmp
           cp -r dist/Spoonbill_AI_Studio.app dmg_tmp/
           ln -s /Applications dmg_tmp/Applications
-          hdiutil create -volname "Spoonbill AI Studio" -srcfolder dmg_tmp -ov -format UDZO "dist_release/Spoonbill_AI_Studio_macOS_Intel_x64.dmg"
+          hdiutil create -volname "Spoonbill AI Studio" -srcfolder dmg_tmp -ov -format UDZO "dist_release/Spoonbill_AI_Studio_v3.0.1_macOS_Intel_x64.dmg"
 
       # ── Build macOS Apple Silicon .DMG ───────────────────────────────────────
       - name: Build macOS Apple Silicon .DMG
@@ -93,15 +98,19 @@ jobs:
           mkdir -p dmg_tmp
           cp -r dist/Spoonbill_AI_Studio.app dmg_tmp/
           ln -s /Applications dmg_tmp/Applications
-          hdiutil create -volname "Spoonbill AI Studio" -srcfolder dmg_tmp -ov -format UDZO "dist_release/Spoonbill_AI_Studio_macOS_AppleSilicon_ARM64.dmg"
+          hdiutil create -volname "Spoonbill AI Studio" -srcfolder dmg_tmp -ov -format UDZO "dist_release/Spoonbill_AI_Studio_v3.0.1_macOS_AppleSilicon_ARM64.dmg"
 
-      # ── Package Universal Portable (Linux) ───────────────────────────────────
-      - name: Package Universal Portable Suite (Linux)
+      # ── Build Linux Installer & Universal Suite ──────────────────────────────
+      - name: Build Linux Installer (.tar.gz) & Universal Portable (.zip)
         if: runner.os == 'Linux'
         run: |
           cd App
           mkdir -p dist_release
-          zip -r dist_release/Spoonbill_AI_Studio_Universal_v3.0.zip . -x "__pycache__/*" "runs/*" "*.tmp" "dist/*" "dist_release/*"
+          chmod +x Install_Linux_App.sh Install_Mac_App.command
+          # 1. Linux Installer Package (.tar.gz)
+          tar -czvf dist_release/Spoonbill_AI_Studio_v3.0.1_Linux_x64.tar.gz --exclude="dist*" --exclude="__pycache__*" --exclude="runs*" .
+          # 2. Universal Portable Package (.zip)
+          zip -r dist_release/Spoonbill_AI_Studio_v3.0.1_Universal_Source.zip . -x "__pycache__/*" "runs/*" "*.tmp" "dist/*" "dist_release/*"
 
       # ── Publish Release Artifacts to GitHub ──────────────────────────────────
       - name: Upload Release Artifacts
@@ -112,5 +121,6 @@ jobs:
             App/dist_release/*.exe
             App/dist_release/*.dmg
             App/dist_release/*.zip
+            App/dist_release/*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
