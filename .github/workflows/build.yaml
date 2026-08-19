@@ -1,0 +1,116 @@
+name: Build and Release Spoonbill AI Studio
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform_name: Windows x64 (.exe)
+          - os: macos-13
+            platform_name: macOS Intel x64 (.dmg)
+          - os: macos-14
+            platform_name: macOS Apple Silicon arm64 (.dmg)
+          - os: ubuntu-latest
+            platform_name: Universal Portable (.zip)
+
+    name: Build on ${{ matrix.platform_name }}
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Set up Python ────────────────────────────────────────────────────────
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # ── Dependencies (Windows) ───────────────────────────────────────────────
+      - name: Install Dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd App
+          python -m pip install --upgrade pip
+          pip install -r requirements_lean.txt pywebview pyinstaller
+
+      # ── Dependencies (macOS / Linux) ─────────────────────────────────────────
+      - name: Install Dependencies (macOS / Linux)
+        if: runner.os != 'Windows'
+        run: |
+          cd App
+          python -m pip install --upgrade pip
+          pip install -r requirements_lean.txt pywebview pyinstaller
+
+      # ── Reconstruct Models ───────────────────────────────────────────────────
+      - name: Reconstruct ONNX Models
+        run: |
+          cd App
+          python -c "from engine_onnx import SpoonbillOnnxEngine; e = SpoonbillOnnxEngine('11l'); SpoonbillOnnxEngine('11n')"
+
+      # ── Build Windows Executable ─────────────────────────────────────────────
+      - name: Build Windows Executable (.exe)
+        if: runner.os == 'Windows'
+        run: |
+          cd App
+          pyinstaller --noconfirm --onedir --windowed --name "Spoonbill_AI_Studio" --add-data "static;static" --add-data "models;models" desktop_app.py
+          mkdir dist_release
+          Compress-Archive -Path "dist/Spoonbill_AI_Studio/*" -DestinationPath "dist_release/Spoonbill_AI_Studio_Windows_x64.zip" -Force
+
+      # ── Build macOS Intel .DMG ───────────────────────────────────────────────
+      - name: Build macOS Intel .DMG
+        if: matrix.os == 'macos-13'
+        run: |
+          cd App
+          pyinstaller --noconfirm --windowed --name "Spoonbill_AI_Studio" --add-data "static:static" --add-data "models:models" desktop_app.py
+          mkdir -p dist_release
+          mkdir -p dmg_tmp
+          cp -r dist/Spoonbill_AI_Studio.app dmg_tmp/
+          ln -s /Applications dmg_tmp/Applications
+          hdiutil create -volname "Spoonbill AI Studio" -srcfolder dmg_tmp -ov -format UDZO "dist_release/Spoonbill_AI_Studio_macOS_Intel_x64.dmg"
+
+      # ── Build macOS Apple Silicon .DMG ───────────────────────────────────────
+      - name: Build macOS Apple Silicon .DMG
+        if: matrix.os == 'macos-14'
+        run: |
+          cd App
+          pyinstaller --noconfirm --windowed --name "Spoonbill_AI_Studio" --add-data "static:static" --add-data "models:models" desktop_app.py
+          mkdir -p dist_release
+          mkdir -p dmg_tmp
+          cp -r dist/Spoonbill_AI_Studio.app dmg_tmp/
+          ln -s /Applications dmg_tmp/Applications
+          hdiutil create -volname "Spoonbill AI Studio" -srcfolder dmg_tmp -ov -format UDZO "dist_release/Spoonbill_AI_Studio_macOS_AppleSilicon_ARM64.dmg"
+
+      # ── Package Universal Portable (Linux) ───────────────────────────────────
+      - name: Package Universal Portable Suite (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cd App
+          mkdir -p dist_release
+          zip -r dist_release/Spoonbill_AI_Studio_Universal_v3.0.zip . -x "__pycache__/*" "runs/*" "*.tmp" "dist/*" "dist_release/*"
+
+      # ── Publish Release Artifacts to GitHub ──────────────────────────────────
+      - name: Upload Release Artifacts
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          files: |
+            App/dist_release/*.exe
+            App/dist_release/*.dmg
+            App/dist_release/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
