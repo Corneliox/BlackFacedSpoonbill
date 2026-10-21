@@ -1,0 +1,24 @@
+{
+  "name": "spoonbill-electron-studio",
+  "version": "4.0.0",
+  "description": "Black-Faced Spoonbill (Platalea minor) Unified AI Studio — Electron Desktop Edition (V4)",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [
+    "electron",
+    "yolov11",
+    "yolov12",
+    "coordinate-attention",
+    "sahi",
+    "onnx",
+    "black-faced-spoonbill",
+    "instance-segmentation"
+  ],
+  "author": "Gilang - Black-Faced Spoonbill AI Research",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.2.0"
+  }
+}

@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spoonbill Studio</title>
+  <link rel="stylesheet" href="/renderer/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="ps-app">
+
+    <!-- 1. SLIM TOP BAR (PHOTOSHOP / WAREHOUSE STYLE) -->
+    <header class="ps-topbar">
+      <div class="topbar-left">
+        <div class="ps-logo">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <span class="ps-app-name">Spoonbill Studio</span>
+        <span class="ps-divider">/</span>
+        <span class="ps-file-tag" id="top-filename">101.jpg</span>
+      </div>
+
+      <!-- WORKSPACE MODE SWITCHER (COMPACT SEGMENTED) -->
+      <div class="topbar-center no-drag">
+        <div class="ps-modes">
+          <button class="mode-btn active" data-view="studio">Studio</button>
+          <button class="mode-btn" data-view="compare">Compare &amp; Grad-CAM</button>
+          <button class="mode-btn" data-view="benchmark">Benchmark</button>
+        </div>
+      </div>
+
+      <!-- TOP ACTIONS -->
+      <div class="topbar-right no-drag">
+        <label class="ps-btn ghost upload-label" title="Buka gambar lokal (Ctrl+O)">
+          <input type="file" id="file-input" accept="image/*" multiple hidden>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span>Open</span>
+        </label>
+        <button class="ps-btn ghost" id="btn-toggle-filmstrip" title="Tampilkan / Sembunyikan Galeri Foto Bawah">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+          <span>Filmstrip</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- 2. MAIN WORKSPACE AREA -->
+    <div class="ps-workspace">
+
+      <!-- A. SLIM LEFT TOOL STRIP (PHOTOSHOP STYLE) -->
+      <aside class="ps-toolstrip" id="ps-toolstrip">
+        <button class="tool-btn active" id="tool-pan" title="Hand Tool (H / Drag Canvas)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
+        </button>
+        <button class="tool-btn" id="tool-fit" title="Fit Screen (F)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+        </button>
+        <button class="tool-btn" id="tool-100" title="100% Zoom (1)">
+          <span style="font-size:10px;font-family:var(--font-mono);font-weight:700;">1:1</span>
+        </button>
+        <div class="tool-separator"></div>
+        <button class="tool-btn active" id="tool-mask" title="Toggle Polygon Masks (M)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </button>
+        <button class="tool-btn active" id="tool-box" title="Toggle Bounding Boxes (B)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+        </button>
+      </aside>
+
+      <!-- B. CANVAS VIEWPORT (PRIMARY FOCUS) -->
+      <section class="ps-canvas-viewport" id="viewport-studio">
+        <div class="drop-hint hidden" id="drop-hint">
+          <span>Drop image here to load</span>
+        </div>
+
+        <div class="ps-busy hidden" id="ps-busy">
+          <div class="ps-spinner"></div>
+          <span id="ps-busy-text">Analyzing image...</span>
+        </div>
+
+        <canvas id="studio-canvas"></canvas>
+
+        <!-- Status footer on canvas -->
+        <div class="ps-canvas-hud">
+          <span id="hud-res">Resolution: —</span>
+          <span class="hud-sep">·</span>
+          <span id="hud-zoom">100%</span>
+          <span class="hud-sep">·</span>
+          <span id="hud-time">— ms</span>
+        </div>
+      </section>
+
+      <!-- C. COMPARATOR VIEWPORT (HIDDEN IN STUDIO VIEW) -->
+      <section class="ps-canvas-viewport hidden" id="viewport-compare">
+        <div class="compare-split">
+          <div class="split-pane">
+            <div class="pane-header">
+              <span class="pane-label" id="cmp-label-a">Model A</span>
+              <span class="pane-count" id="cmp-count-a">0 Birds</span>
+            </div>
+            <div class="pane-canvas-box">
+              <img id="cmp-img-a" src="" alt="Model A">
+            </div>
+          </div>
+          <div class="split-pane">
+            <div class="pane-header">
+              <span class="pane-label accent" id="cmp-label-b">Model B (CoordAtt P3)</span>
+              <span class="pane-count" id="cmp-count-b">0 Birds</span>
+            </div>
+            <div class="pane-canvas-box">
+              <img id="cmp-img-b" src="" alt="Model B">
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- D. BENCHMARK VIEWPORT (HIDDEN IN STUDIO VIEW) -->
+      <section class="ps-canvas-viewport hidden" id="viewport-benchmark">
+        <div class="bench-inner-wrap">
+          <div class="bench-header-bar">
+            <h3>Model Evolution &amp; Ablation Benchmark (13 Models)</h3>
+            <div class="bench-filters" id="bench-filters">
+              <button class="b-pill active" data-filter="ALL">All (13)</button>
+              <button class="b-pill" data-filter="12_Full">Phase 4 Ablation</button>
+              <button class="b-pill" data-filter="Production">Production V3</button>
+            </div>
+          </div>
+          <div class="bench-table-scroll">
+            <table class="ps-table" id="bench-table">
+              <thead>
+                <tr>
+                  <th>Phase / Group</th>
+                  <th>Model Name</th>
+                  <th>Scale</th>
+                  <th>Best Epoch</th>
+                  <th>Mask mAP50</th>
+                  <th>Mask mAP50-95</th>
+                  <th>Mask Prec</th>
+                  <th>Mask Recall</th>
+                  <th>Box mAP50</th>
+                  <th>Box Prec</th>
+                  <th>Val Loss</th>
+                </tr>
+              </thead>
+              <tbody id="bench-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- E. SLIM RIGHT INSPECTOR / DEVELOP PANEL (PHOTOSHOP STYLE) -->
+      <aside class="ps-inspector" id="ps-inspector">
+
+        <!-- 1. INSTANT HERO COUNT -->
+        <div class="ps-section hero-box">
+          <span class="hero-label">Detected Population</span>
+          <div class="hero-val-row">
+            <strong class="hero-number" id="bird-count-hero">0</strong>
+            <span class="hero-unit">Birds</span>
+          </div>
+          <button class="ps-btn primary full" id="btn-run-detect">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <span>Detect Spoonbills</span>
+          </button>
+        </div>
+
+        <!-- 2. MODEL SELECTOR -->
+        <div class="ps-section">
+          <label class="section-label">AI Model</label>
+          <select id="select-model" class="ps-select"></select>
+          <div class="model-badge-row">
+            <span class="badge-text" id="badge-tech">27.6M · ONNX FP32</span>
+            <span class="badge-tag" id="badge-target">Crowds &amp; Panorama</span>
+          </div>
+        </div>
+
+        <!-- 3. PRIMARY CONTROLS (CONFIDENCE & PRESETS) -->
+        <div class="ps-section">
+          <div class="label-row">
+            <label class="section-label">Confidence</label>
+            <span class="value-text" id="conf-val-text">25%</span>
+          </div>
+          <input type="range" id="rng-conf" min="5" max="95" step="5" value="25" class="ps-slider">
+
+          <div class="compact-presets">
+            <button class="preset-pill active" data-p="panorama" title="SAHI On, 640px ubin">Panorama</button>
+            <button class="preset-pill" data-p="wetland" title="CoordAtt @ P3 anti-pantulan air">Wetland</button>
+            <button class="preset-pill" data-p="fast" title="Direct pass cepat">Fast</button>
+          </div>
+        </div>
+
+        <!-- 4. ADVANCED ACCORDION (COLLAPSIBLE - ZERO CLUTTER) -->
+        <details class="ps-section ps-accordion">
+          <summary>
+            <span>Advanced SAHI Tiling</span>
+            <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </summary>
+          <div class="accordion-body">
+            <label class="ps-toggle-row">
+              <span>Enable SAHI Tiling</span>
+              <input type="checkbox" id="chk-sahi" checked>
+              <span class="toggle-ui"></span>
+            </label>
+
+            <div class="label-row" style="margin-top:8px;">
+              <span class="sub-label">Tile Size</span>
+              <span class="value-text" id="tile-val-text">640 px</span>
+            </div>
+            <input type="range" id="rng-tile" min="320" max="1280" step="32" value="640" class="ps-slider">
+
+            <div class="label-row" style="margin-top:8px;">
+              <span class="sub-label">Tile Overlap</span>
+              <span class="value-text" id="overlap-val-text">20%</span>
+            </div>
+            <input type="range" id="rng-overlap" min="5" max="50" step="5" value="20" class="ps-slider">
+
+            <div class="label-row" style="margin-top:8px;">
+              <span class="sub-label">NMS IoU</span>
+              <span class="value-text" id="iou-val-text">0.45</span>
+            </div>
+            <input type="range" id="rng-iou" min="10" max="90" step="5" value="45" class="ps-slider">
+          </div>
+        </details>
+
+        <!-- 5. DETECTIONS LIST ACCORDION (COMPACT) -->
+        <details class="ps-section ps-accordion" open>
+          <summary>
+            <span>Instances (<span id="instances-count-tab">0</span>)</span>
+            <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+          </summary>
+          <div class="accordion-body" style="padding:4px 0 0 0;">
+            <div class="instance-list" id="instance-list">
+              <span class="list-empty">No detections yet. Click Detect Spoonbills.</span>
+            </div>
+          </div>
+        </details>
+
+        <!-- 6. EXPORT ACTIONS -->
+        <div class="ps-section export-box">
+          <button class="ps-btn secondary full" id="btn-export-img" disabled>Save Annotated Image</button>
+          <div class="export-dual">
+            <button class="ps-btn ghost" id="btn-export-csv" disabled>CSV</button>
+            <button class="ps-btn ghost" id="btn-export-yolo" disabled>YOLO (.txt)</button>
+          </div>
+        </div>
+
+      </aside>
+
+    </div>
+
+    <!-- 3. BOTTOM COLLAPSIBLE FILMSTRIP (LIGHTROOM PHOTO BIN STYLE) -->
+    <footer class="ps-filmstrip" id="ps-filmstrip">
+      <div class="filmstrip-header">
+        <span class="fs-title">Dataset &amp; Queue</span>
+        <span class="fs-count" id="fs-count">6 sample images</span>
+      </div>
+      <div class="filmstrip-track" id="filmstrip-track">
+        <!-- Rendered dynamically -->
+      </div>
+    </footer>
+
+  </div>
+
+  <script src="/renderer/app.js"></script>
+</body>
+</html>

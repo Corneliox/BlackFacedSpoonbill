@@ -108,9 +108,23 @@ jobs:
           mkdir -p dist_release
           chmod +x Install_Linux_App.sh Install_Mac_App.command
           # 1. Linux Installer Package (.tar.gz)
-          tar -czvf dist_release/Spoonbill_AI_Studio_v3.0.1_Linux_x64.tar.gz --exclude="dist*" --exclude="__pycache__*" --exclude="runs*" .
+          tar -czvf dist_release/Spoonbill_AI_Studio_v4.0.0_Linux_x64.tar.gz --exclude="dist*" --exclude="__pycache__*" --exclude="runs*" .
           # 2. Universal Portable Package (.zip)
-          zip -r dist_release/Spoonbill_AI_Studio_v3.0.1_Universal_Source.zip . -x "__pycache__/*" "runs/*" "*.tmp" "dist/*" "dist_release/*"
+          zip -r dist_release/Spoonbill_AI_Studio_v4.0.0_Universal_Source.zip . -x "__pycache__/*" "runs/*" "*.tmp" "dist/*" "dist_release/*"
+
+      # ── Build Electron Studio Package (Windows) ──────────────────────────────
+      - name: Setup Node.js for Electron Studio
+        if: runner.os == 'Windows'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build Electron Studio Package (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd Spoonbill_Electron_Studio
+          npm install
+          node package_app.js || true
 
       # ── Publish Release Artifacts to GitHub ──────────────────────────────────
       - name: Upload Release Artifacts
@@ -122,5 +136,6 @@ jobs:
             App/dist_release/*.dmg
             App/dist_release/*.zip
             App/dist_release/*.tar.gz
+            Spoonbill_Electron_Studio/dist/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

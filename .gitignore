@@ -1,3 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+venv/
+ENV/
+env/
+
+# Electron & Node
+node_modules/
+dist/
+dist_release/
+build/
+*.log
+
+# Heavy models and binaries
+*.pt
+runs/
+*.zip
+*.tar.gz
+*.dmg
 Yolov11_InsSeg/FinalExe/*
 Yolov11_InsSeg/dist/PredictBest/_internal/*
-*.zip
