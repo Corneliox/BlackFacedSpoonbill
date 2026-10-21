@@ -50,15 +50,27 @@ public class SpoonbillNvidiaInstaller : Form
     private Label[] sysCardTitles;
     private Label[] sysCardValues;
     private Label[] sysCardBadges;
+    private Panel pnlSysAdvisory;
+    private Label lblAdvisoryTitle;
+    private Label lblAdvisoryDesc;
+    private Button btnHowToReady;
+    private Button btnRefreshScan;
+    private Label lblLastScanTime;
+    private string detectedGpu = null;
+    private bool hasNvidiaGpu = false;
 
     // Step 1: Agreement Controls
     private Label lblAgreeTitle;
     private Label lblAgreeDesc;
     private TextBox txtAgreementTerms;
-    private Panel pnlAgreeCard;
-    private Panel pnlDisagreeCard;
-    private RadioButton rbAgree;
-    private RadioButton rbDisagree;
+    private int agreementChoice = 0; // 0 = unselected/released, 1 = accept, 2 = decline
+    private Panel pnlAgreeBox;
+    private Panel pnlDeclineBox;
+    private Label lblAgreeBoxTitle;
+    private Label lblAgreeBoxSub;
+    private Label lblDeclineBoxTitle;
+    private Label lblDeclineBoxSub;
+    private Label lblAgreementStatus;
 
     // Step 2: Mode & Options Controls
     private Label lblOptTitle;
@@ -305,16 +317,19 @@ public class SpoonbillNvidiaInstaller : Form
         lblSysTitle = new Label();
         lblSysTitle.Text = "System Compatibility & Environment Scan";
         lblSysTitle.Font = new Font("Segoe UI", 13.5F, FontStyle.Bold);
+        lblSysTitle = new Label();
+        lblSysTitle.Text = "System Compatibility & Environment Scan";
+        lblSysTitle.Font = new Font("Segoe UI", 13.5F, FontStyle.Bold);
         lblSysTitle.ForeColor = Color.White;
-        lblSysTitle.Location = new Point(28, 20);
-        lblSysTitle.Size = new Size(540, 28);
+        lblSysTitle.Location = new Point(28, 16);
+        lblSysTitle.Size = new Size(540, 26);
         panelSystemCheck.Controls.Add(lblSysTitle);
 
         lblSysDesc = new Label();
-        lblSysDesc.Text = "Checking operating system architecture, hardware cores, and existing installations.";
+        lblSysDesc.Text = "Verifying operating system architecture, hardware compute, and Python runtime.";
         lblSysDesc.ForeColor = ClrTextSecondary;
-        lblSysDesc.Location = new Point(28, 52);
-        lblSysDesc.Size = new Size(540, 22);
+        lblSysDesc.Location = new Point(28, 42);
+        lblSysDesc.Size = new Size(540, 20);
         panelSystemCheck.Controls.Add(lblSysDesc);
 
         sysCardPanels = new Panel[4];
@@ -323,17 +338,17 @@ public class SpoonbillNvidiaInstaller : Form
         sysCardBadges = new Label[4];
 
         string[] cardHeaders = new string[] {
-            "Operating System",
-            "Processor & Memory",
-            "Existing Installation",
-            "Python AI Environment"
+            "Operating System & Architecture",
+            "Processor & Hardware Cores",
+            "Graphics & Acceleration Engine",
+            "Python AI Inference Runtime"
         };
 
         for (int i = 0; i < 4; i++)
         {
             Panel card = new Panel();
-            card.Size = new Size(540, 60);
-            card.Location = new Point(28, 88 + (i * 70));
+            card.Size = new Size(540, 48);
+            card.Location = new Point(28, 66 + (i * 54));
             card.BackColor = ClrCardBg;
             card.Paint += (s, e) => {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
@@ -348,25 +363,25 @@ public class SpoonbillNvidiaInstaller : Form
             title.Text = cardHeaders[i];
             title.Font = new Font("Segoe UI", 8F, FontStyle.Regular);
             title.ForeColor = ClrTextSecondary;
-            title.Location = new Point(16, 11);
+            title.Location = new Point(16, 7);
             title.AutoSize = true;
             card.Controls.Add(title);
 
             Label val = new Label();
-            val.Text = "Scanning...";
-            val.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+            val.Text = "Scanning environment...";
+            val.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             val.ForeColor = ClrTextPrimary;
-            val.Location = new Point(16, 31);
-            val.Size = new Size(390, 20);
+            val.Location = new Point(16, 24);
+            val.Size = new Size(380, 18);
             card.Controls.Add(val);
 
             Label badge = new Label();
             badge.Text = "CHECKING";
-            badge.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
+            badge.Font = new Font("Segoe UI", 7.5F, FontStyle.Bold);
             badge.ForeColor = ClrNvidiaGreen;
             badge.BackColor = Color.FromArgb(22, 34, 14);
-            badge.Location = new Point(415, 17);
-            badge.Size = new Size(110, 26);
+            badge.Location = new Point(405, 12);
+            badge.Size = new Size(120, 24);
             badge.TextAlign = ContentAlignment.MiddleCenter;
             card.Controls.Add(badge);
 
@@ -375,6 +390,73 @@ public class SpoonbillNvidiaInstaller : Form
             sysCardValues[i] = val;
             sysCardBadges[i] = badge;
         }
+
+        // Advisory Banner for Readiness & Troubleshooting
+        pnlSysAdvisory = new Panel();
+        pnlSysAdvisory.Size = new Size(540, 80);
+        pnlSysAdvisory.Location = new Point(28, 286);
+        pnlSysAdvisory.BackColor = Color.FromArgb(24, 24, 28);
+        pnlSysAdvisory.Paint += (s, e) => {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            bool pyOk = !string.IsNullOrEmpty(pythonBinary);
+            Color bClr = pyOk ? ClrNvidiaGreen : Color.FromArgb(239, 68, 68);
+            using (Pen p = new Pen(bClr, 1.2f))
+            {
+                e.Graphics.DrawRectangle(p, 0, 0, pnlSysAdvisory.Width - 1, pnlSysAdvisory.Height - 1);
+            }
+        };
+        panelSystemCheck.Controls.Add(pnlSysAdvisory);
+
+        lblAdvisoryTitle = new Label();
+        lblAdvisoryTitle.Text = "System Scan Initializing...";
+        lblAdvisoryTitle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        lblAdvisoryTitle.ForeColor = ClrTextPrimary;
+        lblAdvisoryTitle.Location = new Point(16, 10);
+        lblAdvisoryTitle.Size = new Size(508, 20);
+        pnlSysAdvisory.Controls.Add(lblAdvisoryTitle);
+
+        lblAdvisoryDesc = new Label();
+        lblAdvisoryDesc.Text = "Analyzing hardware accelerators and runtime prerequisites...";
+        lblAdvisoryDesc.Font = new Font("Segoe UI", 8F);
+        lblAdvisoryDesc.ForeColor = ClrTextSecondary;
+        lblAdvisoryDesc.Location = new Point(16, 32);
+        lblAdvisoryDesc.Size = new Size(508, 40);
+        pnlSysAdvisory.Controls.Add(lblAdvisoryDesc);
+
+        // System Check Action Row
+        btnHowToReady = new Button();
+        btnHowToReady.Text = "How to Make Ready...";
+        btnHowToReady.Location = new Point(28, 376);
+        btnHowToReady.Size = new Size(175, 34);
+        btnHowToReady.BackColor = Color.FromArgb(36, 36, 42);
+        btnHowToReady.ForeColor = ClrTextPrimary;
+        btnHowToReady.FlatStyle = FlatStyle.Flat;
+        btnHowToReady.FlatAppearance.BorderColor = Color.FromArgb(60, 60, 68);
+        btnHowToReady.Cursor = Cursors.Hand;
+        btnHowToReady.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+        btnHowToReady.Click += (s, e) => ShowTroubleshootingDialog();
+        panelSystemCheck.Controls.Add(btnHowToReady);
+
+        btnRefreshScan = new Button();
+        btnRefreshScan.Text = "Refresh Scan";
+        btnRefreshScan.Location = new Point(211, 376);
+        btnRefreshScan.Size = new Size(130, 34);
+        btnRefreshScan.BackColor = ClrNvidiaGreen;
+        btnRefreshScan.ForeColor = Color.Black;
+        btnRefreshScan.FlatStyle = FlatStyle.Flat;
+        btnRefreshScan.FlatAppearance.BorderSize = 0;
+        btnRefreshScan.Cursor = Cursors.Hand;
+        btnRefreshScan.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+        btnRefreshScan.Click += (s, e) => RunSystemCheck();
+        panelSystemCheck.Controls.Add(btnRefreshScan);
+
+        lblLastScanTime = new Label();
+        lblLastScanTime.Text = "Click Refresh after installing dependencies";
+        lblLastScanTime.Font = new Font("Segoe UI", 8F);
+        lblLastScanTime.ForeColor = ClrTextMuted;
+        lblLastScanTime.Location = new Point(352, 384);
+        lblLastScanTime.Size = new Size(216, 20);
+        panelSystemCheck.Controls.Add(lblLastScanTime);
 
         // ================= PAGE 1: USER AGREEMENT =================
         panelAgreement = new Panel();
@@ -385,15 +467,15 @@ public class SpoonbillNvidiaInstaller : Form
         lblAgreeTitle.Text = "License & AI Dependencies Agreement";
         lblAgreeTitle.Font = new Font("Segoe UI", 13.5F, FontStyle.Bold);
         lblAgreeTitle.ForeColor = Color.White;
-        lblAgreeTitle.Location = new Point(28, 20);
-        lblAgreeTitle.Size = new Size(540, 28);
+        lblAgreeTitle.Location = new Point(28, 16);
+        lblAgreeTitle.Size = new Size(540, 26);
         panelAgreement.Controls.Add(lblAgreeTitle);
 
         lblAgreeDesc = new Label();
-        lblAgreeDesc.Text = "Please review the conservation research license, pip permissions, and privacy policy.";
+        lblAgreeDesc.Text = "Please review the conservation research license, pip permissions, and privacy terms.";
         lblAgreeDesc.ForeColor = ClrTextSecondary;
-        lblAgreeDesc.Location = new Point(28, 52);
-        lblAgreeDesc.Size = new Size(540, 22);
+        lblAgreeDesc.Location = new Point(28, 42);
+        lblAgreeDesc.Size = new Size(540, 20);
         panelAgreement.Controls.Add(lblAgreeDesc);
 
         txtAgreementTerms = new TextBox();
@@ -404,8 +486,8 @@ public class SpoonbillNvidiaInstaller : Form
         txtAgreementTerms.ForeColor = Color.FromArgb(212, 212, 216);
         txtAgreementTerms.Font = new Font("Consolas", 8F, FontStyle.Regular);
         txtAgreementTerms.BorderStyle = BorderStyle.FixedSingle;
-        txtAgreementTerms.Location = new Point(28, 80);
-        txtAgreementTerms.Size = new Size(540, 200);
+        txtAgreementTerms.Location = new Point(28, 68);
+        txtAgreementTerms.Size = new Size(540, 196);
         txtAgreementTerms.Text =
             "BLACK-FACED SPOONBILL AI STUDIO V4 — LICENSE & USAGE AGREEMENT" + Environment.NewLine +
             "=========================================================================" + Environment.NewLine + Environment.NewLine +
@@ -430,56 +512,149 @@ public class SpoonbillNvidiaInstaller : Form
             "If you select 'Do not accept', setup will cancel immediately without writing files.";
         panelAgreement.Controls.Add(txtAgreementTerms);
 
-        // Agreement Selectable Card 1 (Agree)
-        pnlAgreeCard = new Panel();
-        pnlAgreeCard.Size = new Size(540, 50);
-        pnlAgreeCard.Location = new Point(28, 292);
-        pnlAgreeCard.BackColor = ClrCardBg;
-        pnlAgreeCard.Cursor = Cursors.Hand;
-        pnlAgreeCard.Paint += (s, e) => {
-            Color border = rbAgree.Checked ? ClrNvidiaGreen : ClrCardBorder;
-            using (Pen p = new Pen(border, 1.2f))
+        // Agreement Toggleable Choice Box 1 (Accept)
+        pnlAgreeBox = new Panel();
+        pnlAgreeBox.Size = new Size(540, 52);
+        pnlAgreeBox.Location = new Point(28, 274);
+        pnlAgreeBox.BackColor = ClrCardBg;
+        pnlAgreeBox.Cursor = Cursors.Hand;
+        pnlAgreeBox.Paint += (s, e) => {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            bool isSel = (agreementChoice == 1);
+            Color bClr = isSel ? ClrNvidiaGreen : ClrCardBorder;
+            Color fClr = isSel ? Color.FromArgb(20, 34, 14) : ClrCardBg;
+            using (SolidBrush sb = new SolidBrush(fClr))
             {
-                e.Graphics.DrawRectangle(p, 0, 0, pnlAgreeCard.Width - 1, pnlAgreeCard.Height - 1);
+                e.Graphics.FillRectangle(sb, 0, 0, pnlAgreeBox.Width, pnlAgreeBox.Height);
+            }
+            using (Pen p = new Pen(bClr, isSel ? 1.5f : 1f))
+            {
+                e.Graphics.DrawRectangle(p, 0, 0, pnlAgreeBox.Width - 1, pnlAgreeBox.Height - 1);
+            }
+
+            // Indicator Square at (16, 16, 20, 20)
+            if (isSel)
+            {
+                using (SolidBrush b = new SolidBrush(ClrNvidiaGreen))
+                {
+                    e.Graphics.FillRectangle(b, 16, 16, 20, 20);
+                }
+                using (Pen pCheck = new Pen(Color.FromArgb(13, 13, 15), 2.2f))
+                {
+                    e.Graphics.DrawLines(pCheck, new Point[] {
+                        new Point(20, 26),
+                        new Point(24, 31),
+                        new Point(32, 20)
+                    });
+                }
+            }
+            else
+            {
+                using (Pen pBox = new Pen(ClrTextMuted, 1.5f))
+                {
+                    e.Graphics.DrawRectangle(pBox, 16, 16, 20, 20);
+                }
             }
         };
-        pnlAgreeCard.Click += (s, e) => { rbAgree.Checked = true; };
-        panelAgreement.Controls.Add(pnlAgreeCard);
+        panelAgreement.Controls.Add(pnlAgreeBox);
 
-        rbAgree = new RadioButton();
-        rbAgree.Text = "I accept the license terms and agree to install required AI dependencies";
-        rbAgree.Checked = true;
-        rbAgree.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-        rbAgree.ForeColor = ClrTextPrimary;
-        rbAgree.Location = new Point(14, 13);
-        rbAgree.Size = new Size(515, 24);
-        rbAgree.CheckedChanged += (s, e) => { pnlAgreeCard.Invalidate(); pnlDisagreeCard.Invalidate(); };
-        pnlAgreeCard.Controls.Add(rbAgree);
+        lblAgreeBoxTitle = new Label();
+        lblAgreeBoxTitle.Text = "I accept the license terms and agree to install required AI dependencies";
+        lblAgreeBoxTitle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        lblAgreeBoxTitle.ForeColor = ClrTextPrimary;
+        lblAgreeBoxTitle.Location = new Point(48, 9);
+        lblAgreeBoxTitle.AutoSize = true;
+        lblAgreeBoxTitle.Cursor = Cursors.Hand;
+        pnlAgreeBox.Controls.Add(lblAgreeBoxTitle);
 
-        // Agreement Selectable Card 2 (Disagree)
-        pnlDisagreeCard = new Panel();
-        pnlDisagreeCard.Size = new Size(540, 50);
-        pnlDisagreeCard.Location = new Point(28, 350);
-        pnlDisagreeCard.BackColor = ClrCardBg;
-        pnlDisagreeCard.Cursor = Cursors.Hand;
-        pnlDisagreeCard.Paint += (s, e) => {
-            Color border = rbDisagree.Checked ? Color.FromArgb(239, 68, 68) : ClrCardBorder;
-            using (Pen p = new Pen(border, 1.2f))
+        lblAgreeBoxSub = new Label();
+        lblAgreeBoxSub.Text = "Authorizes pip execution for lean runtime libraries (onnxruntime, fastapi, uvicorn).";
+        lblAgreeBoxSub.Font = new Font("Segoe UI", 8F);
+        lblAgreeBoxSub.ForeColor = ClrTextMuted;
+        lblAgreeBoxSub.Location = new Point(48, 28);
+        lblAgreeBoxSub.AutoSize = true;
+        lblAgreeBoxSub.Cursor = Cursors.Hand;
+        pnlAgreeBox.Controls.Add(lblAgreeBoxSub);
+
+        EventHandler onAgreeClick = (s, e) => ToggleAgreementChoice(1);
+        pnlAgreeBox.Click += onAgreeClick;
+        lblAgreeBoxTitle.Click += onAgreeClick;
+        lblAgreeBoxSub.Click += onAgreeClick;
+
+        // Agreement Toggleable Choice Box 2 (Decline)
+        pnlDeclineBox = new Panel();
+        pnlDeclineBox.Size = new Size(540, 52);
+        pnlDeclineBox.Location = new Point(28, 334);
+        pnlDeclineBox.BackColor = ClrCardBg;
+        pnlDeclineBox.Cursor = Cursors.Hand;
+        pnlDeclineBox.Paint += (s, e) => {
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            bool isSel = (agreementChoice == 2);
+            Color bClr = isSel ? Color.FromArgb(239, 68, 68) : ClrCardBorder;
+            Color fClr = isSel ? Color.FromArgb(34, 18, 18) : ClrCardBg;
+            using (SolidBrush sb = new SolidBrush(fClr))
             {
-                e.Graphics.DrawRectangle(p, 0, 0, pnlDisagreeCard.Width - 1, pnlDisagreeCard.Height - 1);
+                e.Graphics.FillRectangle(sb, 0, 0, pnlDeclineBox.Width, pnlDeclineBox.Height);
+            }
+            using (Pen p = new Pen(bClr, isSel ? 1.5f : 1f))
+            {
+                e.Graphics.DrawRectangle(p, 0, 0, pnlDeclineBox.Width - 1, pnlDeclineBox.Height - 1);
+            }
+
+            // Indicator Square at (16, 16, 20, 20)
+            if (isSel)
+            {
+                using (SolidBrush b = new SolidBrush(Color.FromArgb(239, 68, 68)))
+                {
+                    e.Graphics.FillRectangle(b, 16, 16, 20, 20);
+                }
+                using (Pen pX = new Pen(Color.White, 2.0f))
+                {
+                    e.Graphics.DrawLine(pX, 21, 21, 31, 31);
+                    e.Graphics.DrawLine(pX, 31, 21, 21, 31);
+                }
+            }
+            else
+            {
+                using (Pen pBox = new Pen(ClrTextMuted, 1.5f))
+                {
+                    e.Graphics.DrawRectangle(pBox, 16, 16, 20, 20);
+                }
             }
         };
-        pnlDisagreeCard.Click += (s, e) => { rbDisagree.Checked = true; };
-        panelAgreement.Controls.Add(pnlDisagreeCard);
+        panelAgreement.Controls.Add(pnlDeclineBox);
 
-        rbDisagree = new RadioButton();
-        rbDisagree.Text = "I do not accept the terms (Cancel installation and exit setup immediately)";
-        rbDisagree.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
-        rbDisagree.ForeColor = Color.FromArgb(248, 113, 113);
-        rbDisagree.Location = new Point(14, 13);
-        rbDisagree.Size = new Size(515, 24);
-        rbDisagree.CheckedChanged += (s, e) => { pnlAgreeCard.Invalidate(); pnlDisagreeCard.Invalidate(); };
-        pnlDisagreeCard.Controls.Add(rbDisagree);
+        lblDeclineBoxTitle = new Label();
+        lblDeclineBoxTitle.Text = "I do not accept the terms (Cancel installation and exit setup immediately)";
+        lblDeclineBoxTitle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        lblDeclineBoxTitle.ForeColor = Color.FromArgb(248, 113, 113);
+        lblDeclineBoxTitle.Location = new Point(48, 9);
+        lblDeclineBoxTitle.AutoSize = true;
+        lblDeclineBoxTitle.Cursor = Cursors.Hand;
+        pnlDeclineBox.Controls.Add(lblDeclineBoxTitle);
+
+        lblDeclineBoxSub = new Label();
+        lblDeclineBoxSub.Text = "Setup will safely abort without modifying system files or installing packages.";
+        lblDeclineBoxSub.Font = new Font("Segoe UI", 8F);
+        lblDeclineBoxSub.ForeColor = ClrTextMuted;
+        lblDeclineBoxSub.Location = new Point(48, 28);
+        lblDeclineBoxSub.AutoSize = true;
+        lblDeclineBoxSub.Cursor = Cursors.Hand;
+        pnlDeclineBox.Controls.Add(lblDeclineBoxSub);
+
+        EventHandler onDeclineClick = (s, e) => ToggleAgreementChoice(2);
+        pnlDeclineBox.Click += onDeclineClick;
+        lblDeclineBoxTitle.Click += onDeclineClick;
+        lblDeclineBoxSub.Click += onDeclineClick;
+
+        // Agreement Selection Status
+        lblAgreementStatus = new Label();
+        lblAgreementStatus.Font = new Font("Segoe UI", 8.5F);
+        lblAgreementStatus.ForeColor = ClrTextMuted;
+        lblAgreementStatus.Location = new Point(28, 396);
+        lblAgreementStatus.Size = new Size(540, 22);
+        lblAgreementStatus.Text = "Please click an option box above to select your choice (click again to deselect).";
+        panelAgreement.Controls.Add(lblAgreementStatus);
 
         // ================= PAGE 2: MODE & OPTIONS =================
         panelModeAndOptions = new Panel();
@@ -899,8 +1074,7 @@ public class SpoonbillNvidiaInstaller : Form
         else if (step == 1)
         {
             btnBack.Enabled = true;
-            btnNext.Text = "Next >";
-            btnNext.Enabled = true;
+            UpdateAgreementUI();
         }
         else if (step == 2)
         {
@@ -927,7 +1101,7 @@ public class SpoonbillNvidiaInstaller : Form
 
     private void RunSystemCheck()
     {
-        // 1. Operating System
+        // 1. Operating System & Architecture
         sysCardValues[0].Text = Environment.OSVersion.ToString() + " (64-bit)";
         sysCardBadges[0].Text = "COMPATIBLE";
         sysCardBadges[0].ForeColor = ClrNvidiaGreen;
@@ -938,24 +1112,25 @@ public class SpoonbillNvidiaInstaller : Form
         sysCardBadges[1].Text = "READY";
         sysCardBadges[1].ForeColor = ClrNvidiaGreen;
 
-        // 3. Existing Installation Detection
-        existingVersionDetected = Directory.Exists(targetDir) && File.Exists(Path.Combine(targetDir, "Spoonbill_Studio.exe"));
-        if (existingVersionDetected)
+        // 3. Graphics & Hardware Acceleration
+        detectedGpu = DetectGraphicsCard(out hasNvidiaGpu);
+        if (hasNvidiaGpu)
         {
-            sysCardValues[2].Text = "Prior build found at %LOCALAPPDATA%\\Programs...";
-            sysCardBadges[2].Text = "UPGRADE READY";
-            sysCardBadges[2].ForeColor = Color.FromArgb(246, 130, 31);
+            sysCardValues[2].Text = detectedGpu + " (CUDA Capable)";
+            sysCardBadges[2].Text = "NVIDIA GPU";
+            sysCardBadges[2].ForeColor = ClrNvidiaGreen;
         }
         else
         {
-            sysCardValues[2].Text = "Clean system. No existing builds found.";
-            sysCardBadges[2].Text = "CLEAN";
-            sysCardBadges[2].ForeColor = ClrNvidiaGreen;
+            sysCardValues[2].Text = detectedGpu + " (CPU Safe Mode)";
+            sysCardBadges[2].Text = "CPU SAFE MODE";
+            sysCardBadges[2].ForeColor = Color.FromArgb(56, 189, 248);
         }
 
         // 4. Python Environment
         pythonBinary = FindPythonBinary();
-        if (!string.IsNullOrEmpty(pythonBinary))
+        bool pythonReady = !string.IsNullOrEmpty(pythonBinary);
+        if (pythonReady)
         {
             sysCardValues[3].Text = "Python 3 located at " + Path.GetFileName(pythonBinary);
             sysCardBadges[3].Text = "READY";
@@ -967,17 +1142,76 @@ public class SpoonbillNvidiaInstaller : Form
             sysCardBadges[3].Text = "ACTION NEEDED";
             sysCardBadges[3].ForeColor = Color.FromArgb(239, 68, 68);
         }
+
+        existingVersionDetected = Directory.Exists(targetDir) && File.Exists(Path.Combine(targetDir, "Spoonbill_Studio.exe"));
+
+        // Update Advisory Banner
+        if (!pythonReady)
+        {
+            lblAdvisoryTitle.Text = "Action Recommended: Python 3 Runtime Not Found";
+            lblAdvisoryTitle.ForeColor = Color.FromArgb(239, 68, 68);
+            lblAdvisoryDesc.Text = "Python 3.8 - 3.12 is required for neural inference. Click 'How to Make Ready...' for installation commands, then click 'Refresh Scan'.";
+            pnlSysAdvisory.BackColor = Color.FromArgb(32, 18, 18);
+            btnHowToReady.Text = "How to Make Ready...";
+            btnHowToReady.BackColor = Color.FromArgb(60, 24, 24);
+            btnHowToReady.ForeColor = Color.FromArgb(254, 202, 202);
+        }
+        else
+        {
+            lblAdvisoryTitle.Text = "System Ready for Spoonbill AI Studio";
+            lblAdvisoryTitle.ForeColor = ClrNvidiaGreen;
+            string upgradeMsg = existingVersionDetected ? " (Prior installation detected and will be upgraded)." : "";
+            lblAdvisoryDesc.Text = "All core system requirements satisfied" + upgradeMsg + ". You can proceed with installation or review the hardware guide.";
+            pnlSysAdvisory.BackColor = Color.FromArgb(18, 30, 14);
+            btnHowToReady.Text = "Setup & Hardware Guide";
+            btnHowToReady.BackColor = Color.FromArgb(26, 40, 18);
+            btnHowToReady.ForeColor = ClrNvidiaGreen;
+        }
+        pnlSysAdvisory.Invalidate();
+
+        lblLastScanTime.Text = "Scanned: " + DateTime.Now.ToString("HH:mm:ss") + " | Refresh enabled";
     }
 
     private void OnNextClick(object sender, EventArgs e)
     {
         if (currentStep == 0)
         {
+            if (string.IsNullOrEmpty(pythonBinary))
+            {
+                DialogResult res = MessageBox.Show(
+                    this,
+                    "Python 3 runtime was not detected on your system PATH.\n\n" +
+                    "While you can continue to configure installation paths, local neural inference requires Python 3.8 - 3.12.\n\n" +
+                    "Would you like to open the Setup & Readiness Guide to view installation instructions now?\n\n" +
+                    "- Click 'Yes' to view the Setup & Readiness Guide.\n" +
+                    "- Click 'No' to proceed to the License Agreement.",
+                    "Python Runtime Advisory",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Warning
+                );
+                if (res == DialogResult.Yes)
+                {
+                    ShowTroubleshootingDialog();
+                    return;
+                }
+            }
             SwitchStep(1);
         }
         else if (currentStep == 1)
         {
-            if (rbDisagree.Checked)
+            if (agreementChoice == 0)
+            {
+                MessageBox.Show(
+                    this,
+                    "Please click one of the agreement choice boxes above to select your preference before proceeding.\n\n" +
+                    "You can click the box again at any time to deselect it.",
+                    "Agreement Selection Required",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information
+                );
+                return;
+            }
+            if (agreementChoice == 2)
             {
                 DialogResult res = MessageBox.Show(
                     this,
@@ -1365,11 +1599,323 @@ public class SpoonbillNvidiaInstaller : Form
         catch {}
     }
 
+    private string DetectGraphicsCard(out bool hasNvidia)
+    {
+        hasNvidia = false;
+        string detected = null;
+        try
+        {
+            using (RegistryKey root = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"))
+            {
+                if (root != null)
+                {
+                    foreach (string subKeyName in root.GetSubKeyNames())
+                    {
+                        if (subKeyName.StartsWith("0"))
+                        {
+                            using (RegistryKey sub = root.OpenSubKey(subKeyName))
+                            {
+                                if (sub != null)
+                                {
+                                    object desc = sub.GetValue("DriverDesc");
+                                    if (desc != null)
+                                    {
+                                        string name = desc.ToString();
+                                        if (name.IndexOf("Remote", StringComparison.OrdinalIgnoreCase) < 0 &&
+                                            name.IndexOf("Basic Display", StringComparison.OrdinalIgnoreCase) < 0)
+                                        {
+                                            if (name.IndexOf("NVIDIA", StringComparison.OrdinalIgnoreCase) >= 0)
+                                            {
+                                                hasNvidia = true;
+                                                return name;
+                                            }
+                                            else if (detected == null)
+                                            {
+                                                detected = name;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch {}
+
+        if (!string.IsNullOrEmpty(detected)) return detected;
+        return "Standard / Integrated Display Controller";
+    }
+
+    private void ToggleAgreementChoice(int choice)
+    {
+        if (agreementChoice == choice)
+        {
+            agreementChoice = 0; // Release selection
+        }
+        else
+        {
+            agreementChoice = choice; // Select this, deselect the other
+        }
+        UpdateAgreementUI();
+    }
+
+    private void UpdateAgreementUI()
+    {
+        pnlAgreeBox.Invalidate();
+        pnlDeclineBox.Invalidate();
+
+        if (agreementChoice == 0)
+        {
+            lblAgreeBoxTitle.ForeColor = ClrTextPrimary;
+            lblDeclineBoxTitle.ForeColor = ClrTextSecondary;
+            lblAgreementStatus.Text = "Please click an option box above to select your agreement (click again to deselect).";
+            lblAgreementStatus.ForeColor = ClrTextMuted;
+            if (currentStep == 1)
+            {
+                btnNext.Enabled = false;
+                btnNext.Text = "Next >";
+            }
+        }
+        else if (agreementChoice == 1)
+        {
+            lblAgreeBoxTitle.ForeColor = ClrNvidiaGreen;
+            lblDeclineBoxTitle.ForeColor = ClrTextSecondary;
+            lblAgreementStatus.Text = "License accepted. Click 'Next >' to configure installation options.";
+            lblAgreementStatus.ForeColor = ClrNvidiaGreen;
+            if (currentStep == 1)
+            {
+                btnNext.Enabled = true;
+                btnNext.Text = "Next >";
+            }
+        }
+        else if (agreementChoice == 2)
+        {
+            lblAgreeBoxTitle.ForeColor = ClrTextSecondary;
+            lblDeclineBoxTitle.ForeColor = Color.FromArgb(248, 113, 113);
+            lblAgreementStatus.Text = "Decline selected. Click 'Cancel Setup' to abort without writing files.";
+            lblAgreementStatus.ForeColor = Color.FromArgb(248, 113, 113);
+            if (currentStep == 1)
+            {
+                btnNext.Enabled = true;
+                btnNext.Text = "Cancel Setup";
+            }
+        }
+    }
+
+    private void ShowTroubleshootingDialog()
+    {
+        using (SystemReadinessDialog dlg = new SystemReadinessDialog(string.IsNullOrEmpty(pythonBinary), hasNvidiaGpu))
+        {
+            dlg.ShowDialog(this);
+        }
+        RunSystemCheck();
+    }
+
     [STAThread]
     public static void Main()
     {
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
         Application.Run(new SpoonbillNvidiaInstaller());
+    }
+}
+
+public class SystemReadinessDialog : Form
+{
+    public SystemReadinessDialog(bool pythonMissing, bool hasNvidia)
+    {
+        this.Text = "Spoonbill AI Studio — System Setup & Readiness Guide";
+        this.ClientSize = new Size(680, 520);
+        this.StartPosition = FormStartPosition.CenterParent;
+        this.FormBorderStyle = FormBorderStyle.FixedDialog;
+        this.MaximizeBox = false;
+        this.MinimizeBox = false;
+        this.BackColor = Color.FromArgb(19, 19, 22);
+        this.ForeColor = Color.FromArgb(244, 244, 245);
+        this.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
+
+        // Header Panel
+        Panel pnlHeader = new Panel();
+        pnlHeader.Location = new Point(0, 0);
+        pnlHeader.Size = new Size(680, 60);
+        pnlHeader.BackColor = Color.FromArgb(13, 13, 15);
+        pnlHeader.Paint += (s, e) => {
+            e.Graphics.DrawLine(new Pen(Color.FromArgb(34, 34, 39), 1), 0, 59, 680, 59);
+        };
+        this.Controls.Add(pnlHeader);
+
+        Label lblTitle = new Label();
+        lblTitle.Text = "SYSTEM READINESS & SETUP GUIDE";
+        lblTitle.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
+        lblTitle.ForeColor = Color.White;
+        lblTitle.Location = new Point(24, 12);
+        lblTitle.AutoSize = true;
+        pnlHeader.Controls.Add(lblTitle);
+
+        Label lblSub = new Label();
+        lblSub.Text = "Step-by-step instructions to make all hardware and software components ready.";
+        lblSub.Font = new Font("Segoe UI", 8.5F);
+        lblSub.ForeColor = Color.FromArgb(118, 185, 0);
+        lblSub.Location = new Point(25, 34);
+        lblSub.AutoSize = true;
+        pnlHeader.Controls.Add(lblSub);
+
+        // Card 1: Python AI Runtime Setup
+        Panel cardPython = new Panel();
+        cardPython.Location = new Point(24, 74);
+        cardPython.Size = new Size(632, 180);
+        cardPython.BackColor = Color.FromArgb(26, 26, 30);
+        cardPython.Paint += (s, e) => {
+            Color border = pythonMissing ? Color.FromArgb(239, 68, 68) : Color.FromArgb(42, 42, 48);
+            using (Pen p = new Pen(border, 1.2f))
+            {
+                e.Graphics.DrawRectangle(p, 0, 0, cardPython.Width - 1, cardPython.Height - 1);
+            }
+        };
+        this.Controls.Add(cardPython);
+
+        Label lblPyHead = new Label();
+        lblPyHead.Text = "1. Python 3 AI Inference Runtime (Required for Neural Inference)";
+        lblPyHead.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+        lblPyHead.ForeColor = pythonMissing ? Color.FromArgb(248, 113, 113) : Color.FromArgb(118, 185, 0);
+        lblPyHead.Location = new Point(16, 12);
+        lblPyHead.AutoSize = true;
+        cardPython.Controls.Add(lblPyHead);
+
+        Label lblPyBody = new Label();
+        lblPyBody.Text = "Spoonbill Studio requires Python 3.8 to 3.12 (64-bit) for local neural network inference.\n\n" +
+                         "• Method A (Fastest via Windows Terminal / PowerShell):\n" +
+                         "  winget install Python.Python.3.11\n\n" +
+                         "• Method B (Manual Installer from python.org):\n" +
+                         "  Download installer. CRITICAL: Check 'Add python.exe to PATH' at the bottom of setup!";
+        lblPyBody.Font = new Font("Segoe UI", 8.5F);
+        lblPyBody.ForeColor = Color.FromArgb(212, 212, 216);
+        lblPyBody.Location = new Point(16, 34);
+        lblPyBody.Size = new Size(600, 95);
+        cardPython.Controls.Add(lblPyBody);
+
+        Button btnPyWeb = new Button();
+        btnPyWeb.Text = "Download Python (python.org)";
+        btnPyWeb.Location = new Point(16, 136);
+        btnPyWeb.Size = new Size(205, 28);
+        btnPyWeb.BackColor = Color.FromArgb(38, 38, 44);
+        btnPyWeb.ForeColor = Color.White;
+        btnPyWeb.FlatStyle = FlatStyle.Flat;
+        btnPyWeb.FlatAppearance.BorderColor = Color.FromArgb(118, 185, 0);
+        btnPyWeb.Cursor = Cursors.Hand;
+        btnPyWeb.Click += (s, e) => {
+            try { Process.Start("https://www.python.org/downloads/windows/"); } catch {}
+        };
+        cardPython.Controls.Add(btnPyWeb);
+
+        Button btnCopyWinget = new Button();
+        btnCopyWinget.Text = "Copy 'winget' Command";
+        btnCopyWinget.Location = new Point(231, 136);
+        btnCopyWinget.Size = new Size(170, 28);
+        btnCopyWinget.BackColor = Color.FromArgb(38, 38, 44);
+        btnCopyWinget.ForeColor = Color.White;
+        btnCopyWinget.FlatStyle = FlatStyle.Flat;
+        btnCopyWinget.FlatAppearance.BorderColor = Color.FromArgb(60, 60, 68);
+        btnCopyWinget.Cursor = Cursors.Hand;
+        btnCopyWinget.Click += (s, e) => {
+            try {
+                Clipboard.SetText("winget install Python.Python.3.11");
+                MessageBox.Show(this, "Command copied to clipboard!\nOpen PowerShell and press Ctrl+V to install.", "Copied", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            } catch {}
+        };
+        cardPython.Controls.Add(btnCopyWinget);
+
+        // Card 2: GPU Acceleration & CUDA
+        Panel cardGpu = new Panel();
+        cardGpu.Location = new Point(24, 266);
+        cardGpu.Size = new Size(632, 135);
+        cardGpu.BackColor = Color.FromArgb(26, 26, 30);
+        cardGpu.Paint += (s, e) => {
+            using (Pen p = new Pen(Color.FromArgb(42, 42, 48), 1))
+            {
+                e.Graphics.DrawRectangle(p, 0, 0, cardGpu.Width - 1, cardGpu.Height - 1);
+            }
+        };
+        this.Controls.Add(cardGpu);
+
+        Label lblGpuHead = new Label();
+        lblGpuHead.Text = "2. Graphics Acceleration & NVIDIA CUDA (Optional)";
+        lblGpuHead.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+        lblGpuHead.ForeColor = Color.FromArgb(118, 185, 0);
+        lblGpuHead.Location = new Point(16, 12);
+        lblGpuHead.AutoSize = true;
+        cardGpu.Controls.Add(lblGpuHead);
+
+        Label lblGpuBody = new Label();
+        lblGpuBody.Text = "• CPU Safe Mode: Operates out-of-the-box on all laptops (Intel, AMD, CPU) using YOLO11 Nano.\n" +
+                         "• NVIDIA GPU Acceleration: Unlocks YOLO11 Large and BeakAttn models.\n" +
+                         "  Requires NVIDIA GeForce / RTX drivers and the CUDA 12.x Toolkit.";
+        lblGpuBody.Font = new Font("Segoe UI", 8.5F);
+        lblGpuBody.ForeColor = Color.FromArgb(212, 212, 216);
+        lblGpuBody.Location = new Point(16, 34);
+        lblGpuBody.Size = new Size(600, 56);
+        cardGpu.Controls.Add(lblGpuBody);
+
+        Button btnNvidiaWeb = new Button();
+        btnNvidiaWeb.Text = "NVIDIA Drivers";
+        btnNvidiaWeb.Location = new Point(16, 94);
+        btnNvidiaWeb.Size = new Size(130, 28);
+        btnNvidiaWeb.BackColor = Color.FromArgb(38, 38, 44);
+        btnNvidiaWeb.ForeColor = Color.White;
+        btnNvidiaWeb.FlatStyle = FlatStyle.Flat;
+        btnNvidiaWeb.FlatAppearance.BorderColor = Color.FromArgb(60, 60, 68);
+        btnNvidiaWeb.Cursor = Cursors.Hand;
+        btnNvidiaWeb.Click += (s, e) => {
+            try { Process.Start("https://www.nvidia.com/Download/index.aspx"); } catch {}
+        };
+        cardGpu.Controls.Add(btnNvidiaWeb);
+
+        Button btnCudaWeb = new Button();
+        btnCudaWeb.Text = "CUDA Toolkit Downloads";
+        btnCudaWeb.Location = new Point(156, 94);
+        btnCudaWeb.Size = new Size(170, 28);
+        btnCudaWeb.BackColor = Color.FromArgb(38, 38, 44);
+        btnCudaWeb.ForeColor = Color.White;
+        btnCudaWeb.FlatStyle = FlatStyle.Flat;
+        btnCudaWeb.FlatAppearance.BorderColor = Color.FromArgb(60, 60, 68);
+        btnCudaWeb.Cursor = Cursors.Hand;
+        btnCudaWeb.Click += (s, e) => {
+            try { Process.Start("https://developer.nvidia.com/cuda-downloads"); } catch {}
+        };
+        cardGpu.Controls.Add(btnCudaWeb);
+
+        // Note at bottom
+        Label lblRefreshNote = new Label();
+        lblRefreshNote.Text = "Tip: After installing Python or drivers, do NOT restart setup. Simply close this guide and click 'Refresh Scan' on the main window.";
+        lblRefreshNote.Font = new Font("Segoe UI", 8.5F, FontStyle.Italic);
+        lblRefreshNote.ForeColor = Color.FromArgb(161, 161, 170);
+        lblRefreshNote.Location = new Point(24, 412);
+        lblRefreshNote.Size = new Size(632, 34);
+        this.Controls.Add(lblRefreshNote);
+
+        // Bottom Bar
+        Panel pnlBottom = new Panel();
+        pnlBottom.Location = new Point(0, 456);
+        pnlBottom.Size = new Size(680, 64);
+        pnlBottom.BackColor = Color.FromArgb(13, 13, 15);
+        pnlBottom.Paint += (s, e) => {
+            e.Graphics.DrawLine(new Pen(Color.FromArgb(34, 34, 39), 1), 0, 0, 680, 0);
+        };
+        this.Controls.Add(pnlBottom);
+
+        Button btnClose = new Button();
+        btnClose.Text = "Close Guide";
+        btnClose.Location = new Point(540, 14);
+        btnClose.Size = new Size(116, 34);
+        btnClose.BackColor = Color.FromArgb(118, 185, 0);
+        btnClose.ForeColor = Color.Black;
+        btnClose.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        btnClose.FlatStyle = FlatStyle.Flat;
+        btnClose.FlatAppearance.BorderSize = 0;
+        btnClose.Cursor = Cursors.Hand;
+        btnClose.Click += (s, e) => this.Close();
+        pnlBottom.Controls.Add(btnClose);
     }
 }
