@@ -15,12 +15,12 @@ from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from engine_onnx import SpoonbillOnnxEngine, get_base_dir
+from engine_onnx import SpoonbillOnnxEngine, get_base_dir, get_user_data_dir
 
 app = FastAPI(
     title="Spoonbill Studio Universal API",
     description="Lean Cross-Platform API for Black-faced Spoonbill SAHI Segmentation",
-    version="3.0.0"
+    version="4.1.0-experimental"
 )
 
 app.add_middleware(
@@ -32,6 +32,7 @@ app.add_middleware(
 )
 
 BASE_DIR = get_base_dir()
+USER_DATA_DIR = get_user_data_dir()
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 MODELS_DIR = os.path.join(BASE_DIR, "models")
 
@@ -39,8 +40,8 @@ MODELS_DIR = os.path.join(BASE_DIR, "models")
 if os.path.exists(STATIC_DIR):
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
-# Initialize Engine globally
-engine = SpoonbillOnnxEngine(model_type="11l", models_dir=MODELS_DIR)
+# Initialize Engine globally with fast 11n model (<0.15s startup)
+engine = SpoonbillOnnxEngine(model_type="11n", models_dir=MODELS_DIR)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -168,7 +169,7 @@ import zipfile
 import uuid
 import csv
 
-BATCH_DIR = os.path.join(BASE_DIR, "runs", "batch_exports")
+BATCH_DIR = os.path.join(USER_DATA_DIR, "runs", "batch_exports")
 os.makedirs(BATCH_DIR, exist_ok=True)
 
 

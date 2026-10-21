@@ -53,6 +53,8 @@ Version `v4.1.0-experimental` introduces a **Non-Destructive Floating Info Label
 | :--- | :--- | :--- |
 | **Windows 10 / 11** | Experimental Setup Wizard (.exe) | [Download v4.1.0 Experimental Setup](https://github.com/Corneliox/BlackFacedSpoonbill/releases/download/v4.1.0-experimental/Spoonbill_Studio_v4.1.0_Experimental_Setup.exe) |
 | **Windows 10 / 11** | Experimental Portable (.zip) | [Download v4.1.0 Experimental ZIP](https://github.com/Corneliox/BlackFacedSpoonbill/releases/download/v4.1.0-experimental/Spoonbill_Studio_v4.1.0_Experimental_Windows_x64.zip) |
+| **macOS Apple Silicon** | Slim Signed DMG (M1, M2, M3, M4) | [Download v4.1.0 Experimental Apple Silicon DMG](https://github.com/Corneliox/BlackFacedSpoonbill/releases/download/v4.1.0-experimental/Spoonbill_Studio_v4.1.0_Experimental_macOS_AppleSilicon_ARM64.dmg) |
+| **macOS Intel** | Slim Signed DMG (x86_64) | [Download v4.1.0 Experimental Intel Mac DMG](https://github.com/Corneliox/BlackFacedSpoonbill/releases/download/v4.1.0-experimental/Spoonbill_Studio_v4.1.0_Experimental_macOS_Intel_x64.dmg) |
 
 Explore the pre-release notes at the [GitHub Experimental Release Page (v4.1.0-experimental)](https://github.com/Corneliox/BlackFacedSpoonbill/releases/tag/v4.1.0-experimental).
 

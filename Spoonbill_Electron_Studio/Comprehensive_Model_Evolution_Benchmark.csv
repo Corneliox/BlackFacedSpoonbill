@@ -1,0 +1,14 @@
+Group,Model Name,Scale,Dataset / Setup,Total Epochs,Best Epoch,Mask mAP50,Mask mAP50-95,Mask Precision,Mask Recall,Box mAP50,Box mAP50-95,Box Precision,Box Recall,Val Seg Loss,Val Box Loss
+Legacy YOLO11 (268 img),YOLO11n_Legacy_train,N,268 images (Legacy V1/V2),50,50,0.95507,0.92334,0.99671,0.95238,0.9555,0.91512,0.99671,0.95238,0.49652,0.4014
+Current Production V3 (300 img),YOLO11n_V3_DualT4,N,300 images (Cleaned V4),76,61,0.91994,0.74868,0.83827,0.86419,0.91994,0.77848,0.83827,0.86419,0.90843,0.60801
+Current Production V3 (300 img),YOLO11l_V3_DualT4,L,300 images (Cleaned V4),100,89,0.93938,0.74093,0.8738,0.91667,0.93938,0.79956,0.8738,0.91667,0.97188,0.51989
+Pilot Attention (12n_Pilot),YOLO11n_Pilot_Baseline,N,300 images (Pretrained COCO),58,55,0.9386,0.74905,1.0,0.86774,0.9386,0.73187,1.0,0.86774,0.9565,0.73586
+Pilot Attention (12n_Pilot),BeakAttn_Nano_Pilot_Scratch,N,300 images (From Scratch),100,90,0.82882,0.48299,0.87314,0.70833,0.85138,0.42495,0.87314,0.70833,1.88037,1.75885
+12_Full Ablation (300 img),Baseline_N (12_Full),N,300 images (Transfer Learning),69,64,0.945,0.74114,0.91243,0.86852,0.945,0.79238,0.91243,0.86852,0.98071,0.63247
+12_Full Ablation (300 img),BeakAttn_N (12_Full),N,300 images (CoordAtt @ P3 + TL),71,61,0.92435,0.66535,0.83925,0.87032,0.92435,0.68644,0.83925,0.87032,1.39946,1.00758
+12_Full Ablation (300 img),Baseline_S (12_Full),S,300 images (Transfer Learning),80,38,0.92843,0.71597,0.81998,1.0,0.92843,0.71621,0.81998,1.0,1.22759,0.7859
+12_Full Ablation (300 img),BeakAttn_S (12_Full),S,300 images (CoordAtt @ P3 + TL),100,73,0.8942,0.67863,0.79561,0.875,0.8876,0.63334,0.79561,0.875,1.23806,1.09954
+12_Full Ablation (300 img),Baseline_M (12_Full),M,300 images (Transfer Learning),81,80,0.95129,0.73673,0.91264,0.87072,0.95129,0.77035,0.91264,0.87072,1.20042,0.6457
+12_Full Ablation (300 img),BeakAttn_M (12_Full),M,300 images (CoordAtt @ P3 + TL),100,84,0.91415,0.69824,0.83212,0.82633,0.91415,0.69664,0.83212,0.82633,1.22195,0.84187
+12_Full Ablation (300 img),Baseline_L (12_Full),L,300 images (Transfer Learning),55,35,0.87173,0.6664,0.68373,0.90106,0.874,0.70109,0.68373,0.90106,1.4255,0.75882
+12_Full Ablation (300 img),BeakAttn_L (12_Full),L,300 images (CoordAtt @ P3 + TL),84,65,0.86224,0.65853,0.8279,0.83333,0.92842,0.71806,0.87749,0.875,1.41265,0.84918

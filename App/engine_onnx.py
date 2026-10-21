@@ -20,10 +20,27 @@ def get_base_dir() -> str:
     return os.path.dirname(os.path.abspath(__file__))
 
 
+def get_user_data_dir() -> str:
+    import tempfile
+    try:
+        if sys.platform == "darwin":
+            base = os.path.expanduser("~/Library/Application Support/SpoonbillStudio")
+        elif sys.platform == "win32":
+            base = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "SpoonbillStudio")
+        else:
+            base = os.path.expanduser("~/.spoonbill_studio")
+        os.makedirs(base, exist_ok=True)
+        return base
+    except Exception:
+        fallback = os.path.join(tempfile.gettempdir(), "SpoonbillStudio")
+        os.makedirs(fallback, exist_ok=True)
+        return fallback
+
+
 class SpoonbillOnnxEngine:
     def __init__(
         self,
-        model_type: str = "11l",
+        model_type: str = "11n",
         slice_size: int = 640,
         overlap_ratio: float = 0.20,
         conf_threshold: float = 0.25,
@@ -37,18 +54,21 @@ class SpoonbillOnnxEngine:
         self.iou_threshold = iou_threshold
 
         self.base_dir = get_base_dir()
+        self.user_data_dir = get_user_data_dir()
         self.models_dir = models_dir if models_dir else os.path.join(self.base_dir, "models")
         self.sessions: Dict[str, ort.InferenceSession] = {}
         self.active_model_type = model_type
 
-        # Available execution providers (auto-selects CoreML on Mac, DirectML/CUDA on Windows, or CPU)
+        # On macOS Apple Silicon (M1/M2/M3/M4), CPUExecutionProvider uses ARM64 NEON / Accelerate
+        # with <0.15s startup and ~25ms inference, avoiding CoreMLExecutionProvider's 25s dynamic-mask freeze.
         available_providers = ort.get_available_providers()
-        self.providers = []
-        for p in ["CoreMLExecutionProvider", "DmlExecutionProvider", "CUDAExecutionProvider", "CPUExecutionProvider"]:
-            if p in available_providers:
-                self.providers.append(p)
-        if not self.providers:
+        if sys.platform == "darwin":
             self.providers = ["CPUExecutionProvider"]
+        else:
+            self.providers = [
+                p for p in ["DmlExecutionProvider", "CUDAExecutionProvider", "CPUExecutionProvider"]
+                if p in available_providers
+            ] or ["CPUExecutionProvider"]
 
         print(f"[ONNX Engine] Initialized with providers: {self.providers}")
         self.load_model(model_type)
@@ -58,39 +78,42 @@ class SpoonbillOnnxEngine:
             "11l": "best_spoonbill_11l.onnx",
             "11n": "best_spoonbill_11n.onnx"
         }
-        fname = filename_map.get(model_type, "best_spoonbill_11l.onnx")
+        fname = filename_map.get(model_type, "best_spoonbill_11n.onnx")
+        user_models_dir = os.path.join(self.user_data_dir, "models")
+        os.makedirs(user_models_dir, exist_ok=True)
 
-        # 1. Auto-reconstruct from multipart chunks (.part1, .part2, ...)
+        # 0. Check if already exists directly
+        for d in [self.models_dir, os.path.join(self.base_dir, "models"), user_models_dir, self.base_dir]:
+            if os.path.isdir(d):
+                cand = os.path.join(d, fname)
+                if os.path.exists(cand) and os.path.getsize(cand) > 1_000_000:
+                    return cand
+
+        # 1. Auto-reconstruct from multipart chunks (.part1, .part2, ...) into writable dir if bundle is read-only
         for d in [self.models_dir, os.path.join(self.base_dir, "models"), self.base_dir]:
             if not os.path.isdir(d):
                 continue
-            target_p = os.path.join(d, fname)
             part1_p = os.path.join(d, f"{fname}.part1")
-            if not os.path.exists(target_p) and os.path.exists(part1_p):
-                print(f"[ONNX Engine] Reconstructing {fname} from binary parts...")
+            if os.path.exists(part1_p):
+                target_p = os.path.join(d, fname)
+                if getattr(sys, "frozen", False) or sys.platform == "darwin":
+                    target_p = os.path.join(user_models_dir, fname)
+                print(f"[ONNX Engine] Reconstructing {fname} from binary parts to {target_p}...")
                 parts = sorted(
                     [os.path.join(d, f) for f in os.listdir(d) if f.startswith(f"{fname}.part")],
                     key=lambda x: int(x.split(".part")[-1]) if x.split(".part")[-1].isdigit() else 0
                 )
-                with open(target_p, "wb") as outfile:
-                    for part_f in parts:
-                        with open(part_f, "rb") as infile:
-                            outfile.write(infile.read())
-                if os.path.exists(target_p):
-                    print(f"[ONNX Engine] {fname} successfully reconstructed ({os.path.getsize(target_p):,} bytes).")
-                    return target_p
-
-        # 2. Auto-extract from .zip if needed
-        for d in [self.models_dir, os.path.join(self.base_dir, "models"), self.base_dir]:
-            if not os.path.isdir(d):
-                continue
-            target_p = os.path.join(d, fname)
-            zip_p = target_p + ".zip"
-            if not os.path.exists(target_p) and os.path.exists(zip_p):
-                print(f"[ONNX Engine] Extracting {fname} from {zip_p}...")
-                import zipfile
-                with zipfile.ZipFile(zip_p, 'r') as zf:
-                    zf.extractall(d)
+                try:
+                    with open(target_p, "wb") as outfile:
+                        for part_f in parts:
+                            with open(part_f, "rb") as infile:
+                                outfile.write(infile.read())
+                except PermissionError:
+                    target_p = os.path.join(user_models_dir, fname)
+                    with open(target_p, "wb") as outfile:
+                        for part_f in parts:
+                            with open(part_f, "rb") as infile:
+                                outfile.write(infile.read())
                 if os.path.exists(target_p):
                     return target_p
 

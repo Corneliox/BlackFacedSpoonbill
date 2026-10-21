@@ -56,49 +56,174 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements_lean.txt pywebview pyinstaller
 
-      # ── Reconstruct Models ───────────────────────────────────────────────────
-      - name: Reconstruct ONNX Models
+      # ── Reconstruct Models & Generate Icons ──────────────────────────────────
+      - name: Reconstruct ONNX Models & Generate App Icons
         run: |
           cd App
-          python -c "from engine_onnx import SpoonbillOnnxEngine; e = SpoonbillOnnxEngine('11l'); SpoonbillOnnxEngine('11n')"
+          python generate_icon.py
+          python -c "from engine_onnx import SpoonbillOnnxEngine; SpoonbillOnnxEngine('11n')"
 
       # ── Build Windows (Ready-to-run .EXE and Portable ZIP) ────────────────────
       - name: Build Windows Standalone .EXE and Portable ZIP
         if: runner.os == 'Windows'
         run: |
           cd App
+          python -c "from engine_onnx import SpoonbillOnnxEngine; SpoonbillOnnxEngine('11l')"
+          Remove-Item "models/*.part*" -Force -ErrorAction SilentlyContinue
           mkdir dist_release
           # 1. Build Standalone 1-File Executable (.exe ready to run)
-          pyinstaller --noconfirm --onefile --windowed --name "Spoonbill_Studio_v4.0.0_DirectRun_Windows_x64" --add-data "static;static" --add-data "models;models" desktop_app.py
+          pyinstaller --noconfirm --onefile --windowed --icon "icon.ico" --name "Spoonbill_Studio_v4.0.0_DirectRun_Windows_x64" --paths "../Spoonbill_Electron_Studio/backend" --add-data "../Spoonbill_Electron_Studio/backend;backend" --add-data "../Spoonbill_Electron_Studio/renderer;renderer" --add-data "../Spoonbill_Electron_Studio/samples;samples" --add-data "../Spoonbill_Electron_Studio/Comprehensive_Model_Evolution_Benchmark.csv;." --add-data "static;static" --add-data "models;models" --hidden-import "server" --hidden-import "unified_engine" --hidden-import "uvicorn.logging" --hidden-import "uvicorn.loops.auto" --hidden-import "uvicorn.protocols.http.auto" --hidden-import "uvicorn.lifespan.on" --hidden-import "multipart" --hidden-import "python_multipart" desktop_app.py
           Move-Item "dist/Spoonbill_Studio_v4.0.0_DirectRun_Windows_x64.exe" "dist_release/" -Force
 
           # 2. Build Onedir Folder & ZIP
-          pyinstaller --noconfirm --onedir --windowed --name "Spoonbill_AI_Studio" --add-data "static;static" --add-data "models;models" desktop_app.py
+          pyinstaller --noconfirm --onedir --windowed --icon "icon.ico" --name "Spoonbill_AI_Studio" --paths "../Spoonbill_Electron_Studio/backend" --add-data "../Spoonbill_Electron_Studio/backend;backend" --add-data "../Spoonbill_Electron_Studio/renderer;renderer" --add-data "../Spoonbill_Electron_Studio/samples;samples" --add-data "../Spoonbill_Electron_Studio/Comprehensive_Model_Evolution_Benchmark.csv;." --add-data "static;static" --add-data "models;models" --hidden-import "server" --hidden-import "unified_engine" --hidden-import "uvicorn.logging" --hidden-import "uvicorn.loops.auto" --hidden-import "uvicorn.protocols.http.auto" --hidden-import "uvicorn.lifespan.on" --hidden-import "multipart" --hidden-import "python_multipart" desktop_app.py
           Compress-Archive -Path "dist/Spoonbill_AI_Studio/*" -DestinationPath "dist_release/Spoonbill_Studio_v4.0.0_DirectRun_Windows_x64_Portable.zip" -Force
 
-      # ── Build macOS Intel .DMG ───────────────────────────────────────────────
+      # ── Build macOS Intel .DMG (Slim Signed V4.1 Studio + Icon + Gatekeeper Unlocker) ──
       - name: Build macOS Intel .DMG
         if: matrix.os == 'macos-15-intel'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd App
-          pyinstaller --noconfirm --windowed --name "Spoonbill_AI_Studio" --add-data "static:static" --add-data "models:models" desktop_app.py
+          # 1. Convert icon.png to native macOS Retina icon.icns
+          mkdir -p Spoonbill.iconset
+          sips -z 16 16     icon.png --out Spoonbill.iconset/icon_16x16.png
+          sips -z 32 32     icon.png --out Spoonbill.iconset/icon_16x16@2x.png
+          sips -z 32 32     icon.png --out Spoonbill.iconset/icon_32x32.png
+          sips -z 64 64     icon.png --out Spoonbill.iconset/icon_32x32@2x.png
+          sips -z 128 128   icon.png --out Spoonbill.iconset/icon_128x128.png
+          sips -z 256 256   icon.png --out Spoonbill.iconset/icon_128x128@2x.png
+          sips -z 256 256   icon.png --out Spoonbill.iconset/icon_256x256.png
+          sips -z 512 512   icon.png --out Spoonbill.iconset/icon_256x256@2x.png
+          sips -z 512 512   icon.png --out Spoonbill.iconset/icon_512x512.png
+          sips -z 1024 1024 icon.png --out Spoonbill.iconset/icon_512x512@2x.png
+          iconutil -c icns Spoonbill.iconset -o icon.icns
+
+          # 2. Remove multipart chunks & keep slim 11N model offline (11L downloads on-demand into ~/Library/Application Support/SpoonbillStudio/models)
+          rm -f models/*.part* models/best_spoonbill_11l.onnx
+
+          # 3. Build macOS .app bundle with V4.1 Unified Studio, Dataset samples, and custom icon.icns
+          pyinstaller --noconfirm --windowed --strip \
+            --name "Spoonbill_AI_Studio" \
+            --icon "icon.icns" \
+            --osx-bundle-identifier "com.spoonbill.aistudio" \
+            --paths "../Spoonbill_Electron_Studio/backend" \
+            --add-data "../Spoonbill_Electron_Studio/backend:backend" \
+            --add-data "../Spoonbill_Electron_Studio/renderer:renderer" \
+            --add-data "../Spoonbill_Electron_Studio/samples:samples" \
+            --add-data "../Spoonbill_Electron_Studio/Comprehensive_Model_Evolution_Benchmark.csv:." \
+            --add-data "static:static" \
+            --add-data "models:models" \
+            --hidden-import "server" \
+            --hidden-import "unified_engine" \
+            --hidden-import "uvicorn.logging" \
+            --hidden-import "uvicorn.loops" \
+            --hidden-import "uvicorn.loops.auto" \
+            --hidden-import "uvicorn.protocols" \
+            --hidden-import "uvicorn.protocols.http" \
+            --hidden-import "uvicorn.protocols.http.auto" \
+            --hidden-import "uvicorn.lifespan" \
+            --hidden-import "uvicorn.lifespan.on" \
+            --hidden-import "multipart" \
+            --hidden-import "python_multipart" \
+            --exclude-module "tkinter" \
+            --exclude-module "matplotlib" \
+            --exclude-module "scipy" \
+            --exclude-module "unittest" \
+            --exclude-module "pydoc" \
+            desktop_app.py
+
+          # 4. Deep Ad-Hoc Code Signing with Entitlements for macOS Gatekeeper & Library Validation
+          xattr -cr dist/Spoonbill_AI_Studio.app
+          codesign --force --deep --sign - --entitlements entitlements.mac.plist --timestamp=none dist/Spoonbill_AI_Studio.app
+
+          # 5. Package DMG using ditto (preserving internal .app symlinks so size is not doubled!)
           mkdir -p dist_release
           mkdir -p dmg_tmp
-          cp -r dist/Spoonbill_AI_Studio.app dmg_tmp/
+          ditto dist/Spoonbill_AI_Studio.app dmg_tmp/Spoonbill_AI_Studio.app
+          cp icon.icns dmg_tmp/.VolumeIcon.icns
+          cp Unlock_and_Open_Mac.command dmg_tmp/Unlock_and_Open_Mac.command
+          chmod +x dmg_tmp/Unlock_and_Open_Mac.command
           ln -s /Applications dmg_tmp/Applications
-          hdiutil create -volname "Spoonbill AI Studio" -srcfolder dmg_tmp -ov -format UDZO "dist_release/Spoonbill_Studio_v4.0.0_macOS_Intel_x64.dmg"
+          hdiutil create -volname "Spoonbill AI Studio" -srcfolder dmg_tmp -ov -format UDZO -imagekey zlib-level=9 "dist_release/Spoonbill_Studio_v4.0.0_macOS_Intel_x64.dmg"
+          cp "dist_release/Spoonbill_Studio_v4.0.0_macOS_Intel_x64.dmg" "dist_release/Spoonbill_Studio_v4.1.0_Experimental_macOS_Intel_x64.dmg"
+          ls -lh dist_release/
+          gh release upload v4.0.0 "dist_release/Spoonbill_Studio_v4.0.0_macOS_Intel_x64.dmg" --clobber || true
+          gh release upload v4.1.0-experimental "dist_release/Spoonbill_Studio_v4.1.0_Experimental_macOS_Intel_x64.dmg" "dist_release/Spoonbill_Studio_v4.0.0_macOS_Intel_x64.dmg" --clobber || true
 
-      # ── Build macOS Apple Silicon .DMG ───────────────────────────────────────
+      # ── Build macOS Apple Silicon .DMG (Slim Signed V4.1 Studio + Icon + Gatekeeper Unlocker) ──
       - name: Build macOS Apple Silicon .DMG
         if: matrix.os == 'macos-14'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd App
-          pyinstaller --noconfirm --windowed --name "Spoonbill_AI_Studio" --add-data "static:static" --add-data "models:models" desktop_app.py
+          # 1. Convert icon.png to native macOS Retina icon.icns
+          mkdir -p Spoonbill.iconset
+          sips -z 16 16     icon.png --out Spoonbill.iconset/icon_16x16.png
+          sips -z 32 32     icon.png --out Spoonbill.iconset/icon_16x16@2x.png
+          sips -z 32 32     icon.png --out Spoonbill.iconset/icon_32x32.png
+          sips -z 64 64     icon.png --out Spoonbill.iconset/icon_32x32@2x.png
+          sips -z 128 128   icon.png --out Spoonbill.iconset/icon_128x128.png
+          sips -z 256 256   icon.png --out Spoonbill.iconset/icon_128x128@2x.png
+          sips -z 256 256   icon.png --out Spoonbill.iconset/icon_256x256.png
+          sips -z 512 512   icon.png --out Spoonbill.iconset/icon_256x256@2x.png
+          sips -z 512 512   icon.png --out Spoonbill.iconset/icon_512x512.png
+          sips -z 1024 1024 icon.png --out Spoonbill.iconset/icon_512x512@2x.png
+          iconutil -c icns Spoonbill.iconset -o icon.icns
+
+          # 2. Remove multipart chunks & keep slim 11N model offline (11L downloads on-demand into ~/Library/Application Support/SpoonbillStudio/models)
+          rm -f models/*.part* models/best_spoonbill_11l.onnx
+
+          # 3. Build macOS Apple Silicon (arm64) .app bundle with V4.1 Unified Studio, Dataset samples, and custom icon.icns
+          pyinstaller --noconfirm --windowed --strip \
+            --name "Spoonbill_AI_Studio" \
+            --icon "icon.icns" \
+            --osx-bundle-identifier "com.spoonbill.aistudio" \
+            --paths "../Spoonbill_Electron_Studio/backend" \
+            --add-data "../Spoonbill_Electron_Studio/backend:backend" \
+            --add-data "../Spoonbill_Electron_Studio/renderer:renderer" \
+            --add-data "../Spoonbill_Electron_Studio/samples:samples" \
+            --add-data "../Spoonbill_Electron_Studio/Comprehensive_Model_Evolution_Benchmark.csv:." \
+            --add-data "static:static" \
+            --add-data "models:models" \
+            --hidden-import "server" \
+            --hidden-import "unified_engine" \
+            --hidden-import "uvicorn.logging" \
+            --hidden-import "uvicorn.loops" \
+            --hidden-import "uvicorn.loops.auto" \
+            --hidden-import "uvicorn.protocols" \
+            --hidden-import "uvicorn.protocols.http" \
+            --hidden-import "uvicorn.protocols.http.auto" \
+            --hidden-import "uvicorn.lifespan" \
+            --hidden-import "uvicorn.lifespan.on" \
+            --hidden-import "multipart" \
+            --hidden-import "python_multipart" \
+            --exclude-module "tkinter" \
+            --exclude-module "matplotlib" \
+            --exclude-module "scipy" \
+            --exclude-module "unittest" \
+            --exclude-module "pydoc" \
+            desktop_app.py
+
+          # 4. Deep Ad-Hoc Code Signing with Entitlements for Apple Silicon M1/M2/M3/M4 Kernel Enforcement
+          xattr -cr dist/Spoonbill_AI_Studio.app
+          codesign --force --deep --sign - --entitlements entitlements.mac.plist --timestamp=none dist/Spoonbill_AI_Studio.app
+
+          # 5. Package DMG using ditto (preserving internal .app symlinks so size is reduced by ~90%!)
           mkdir -p dist_release
           mkdir -p dmg_tmp
-          cp -r dist/Spoonbill_AI_Studio.app dmg_tmp/
+          ditto dist/Spoonbill_AI_Studio.app dmg_tmp/Spoonbill_AI_Studio.app
+          cp icon.icns dmg_tmp/.VolumeIcon.icns
+          cp Unlock_and_Open_Mac.command dmg_tmp/Unlock_and_Open_Mac.command
+          chmod +x dmg_tmp/Unlock_and_Open_Mac.command
           ln -s /Applications dmg_tmp/Applications
-          hdiutil create -volname "Spoonbill AI Studio" -srcfolder dmg_tmp -ov -format UDZO "dist_release/Spoonbill_Studio_v4.0.0_macOS_AppleSilicon_ARM64.dmg"
+          hdiutil create -volname "Spoonbill AI Studio" -srcfolder dmg_tmp -ov -format UDZO -imagekey zlib-level=9 "dist_release/Spoonbill_Studio_v4.0.0_macOS_AppleSilicon_ARM64.dmg"
+          cp "dist_release/Spoonbill_Studio_v4.0.0_macOS_AppleSilicon_ARM64.dmg" "dist_release/Spoonbill_Studio_v4.1.0_Experimental_macOS_AppleSilicon_ARM64.dmg"
+          ls -lh dist_release/
+          gh release upload v4.0.0 "dist_release/Spoonbill_Studio_v4.0.0_macOS_AppleSilicon_ARM64.dmg" --clobber || true
+          gh release upload v4.1.0-experimental "dist_release/Spoonbill_Studio_v4.1.0_Experimental_macOS_AppleSilicon_ARM64.dmg" "dist_release/Spoonbill_Studio_v4.0.0_macOS_AppleSilicon_ARM64.dmg" --clobber || true
 
       # ── Build Linux Installer & Universal Suite ──────────────────────────────
       - name: Build Linux Installer (.tar.gz) & Universal Portable (.zip)
@@ -106,7 +231,7 @@ jobs:
         run: |
           cd App
           mkdir -p dist_release
-          chmod +x Install_Linux_App.sh Install_Mac_App.command
+          chmod +x Install_Linux_App.sh Install_Mac_App.command Unlock_and_Open_Mac.command
           # 1. Linux Installer Package (.tar.gz)
           tar -czvf dist_release/Spoonbill_Studio_v4.0.0_Linux_x64.tar.gz --exclude="dist*" --exclude="__pycache__*" --exclude="runs*" .
           # 2. Universal Portable Package (.zip)
@@ -132,6 +257,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
         with:
+          prerelease: ${{ contains(github.ref_name, 'experimental') }}
           files: |
             App/dist_release/*.exe
             App/dist_release/*.dmg

@@ -25,11 +25,16 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 # Ensure backend directory is in sys.path and CoordAtt is registered in __main__
-BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, "frozen", False):
+    _FROZEN_ROOT = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+    BACKEND_DIR = os.path.join(_FROZEN_ROOT, "backend")
+else:
+    BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 
-from unified_engine import UnifiedSpoonbillEngine, CoordAtt, register_coord_att, APP_ROOT_DIR, WORKSPACE_ROOT
+from unified_engine import UnifiedSpoonbillEngine, CoordAtt, register_coord_att, APP_ROOT_DIR, WORKSPACE_ROOT, USER_DATA_DIR
 
 # Explicitly bind CoordAtt to __main__ for torch.load unpickling
 try:
@@ -53,12 +58,47 @@ app.add_middleware(
 )
 
 RENDERER_DIR = os.path.join(APP_ROOT_DIR, "renderer")
-BATCH_EXPORT_DIR = os.path.join(APP_ROOT_DIR, "exports")
-DATASET_DIR = os.path.join(WORKSPACE_ROOT, "Dataset")
-FIGURES_DIR = os.path.join(WORKSPACE_ROOT, "12_Full", "Result_Draft_Figures")
-BENCHMARK_CSV = os.path.join(WORKSPACE_ROOT, "Comprehensive_Model_Evolution_Benchmark.csv")
 
-os.makedirs(BATCH_EXPORT_DIR, exist_ok=True)
+
+def _resolve_batch_export_dir() -> str:
+    if getattr(sys, "frozen", False) or sys.platform == "darwin":
+        d = os.path.join(USER_DATA_DIR, "exports")
+        os.makedirs(d, exist_ok=True)
+        return d
+    try:
+        d = os.path.join(APP_ROOT_DIR, "exports")
+        os.makedirs(d, exist_ok=True)
+        return d
+    except Exception:
+        d = os.path.join(USER_DATA_DIR, "exports")
+        os.makedirs(d, exist_ok=True)
+        return d
+
+
+def _resolve_dataset_dir() -> str:
+    for cand in [
+        os.path.join(APP_ROOT_DIR, "samples"),
+        os.path.join(APP_ROOT_DIR, "Dataset"),
+        os.path.join(WORKSPACE_ROOT, "Dataset"),
+        os.path.join(WORKSPACE_ROOT, "docs", "samples"),
+    ]:
+        if os.path.isdir(cand):
+            return cand
+    return os.path.join(APP_ROOT_DIR, "samples")
+
+
+BATCH_EXPORT_DIR = _resolve_batch_export_dir()
+DATASET_DIR = _resolve_dataset_dir()
+FIGURES_DIR = (
+    os.path.join(APP_ROOT_DIR, "Result_Draft_Figures")
+    if os.path.exists(os.path.join(APP_ROOT_DIR, "Result_Draft_Figures"))
+    else os.path.join(WORKSPACE_ROOT, "12_Full", "Result_Draft_Figures")
+)
+BENCHMARK_CSV = (
+    os.path.join(APP_ROOT_DIR, "Comprehensive_Model_Evolution_Benchmark.csv")
+    if os.path.exists(os.path.join(APP_ROOT_DIR, "Comprehensive_Model_Evolution_Benchmark.csv"))
+    else os.path.join(WORKSPACE_ROOT, "Comprehensive_Model_Evolution_Benchmark.csv")
+)
 
 if os.path.exists(RENDERER_DIR):
     app.mount("/renderer", StaticFiles(directory=RENDERER_DIR), name="renderer")

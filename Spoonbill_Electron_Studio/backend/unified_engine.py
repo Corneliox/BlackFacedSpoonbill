@@ -102,13 +102,41 @@ register_coord_att()
 # =====================================================================
 # 2. WORKSPACE PATH RESOLUTION & MODEL CATALOG
 # =====================================================================
-BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
-APP_ROOT_DIR = os.path.dirname(BACKEND_DIR)
+if getattr(sys, "frozen", False):
+    APP_ROOT_DIR = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
+    BACKEND_DIR = os.path.join(APP_ROOT_DIR, "backend")
+else:
+    BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+    APP_ROOT_DIR = os.path.dirname(BACKEND_DIR)
+
+
+def get_user_data_dir() -> str:
+    """Returns a guaranteed writable user data directory across macOS (App Translocation safe), Windows, and Linux."""
+    import tempfile
+    try:
+        if sys.platform == "darwin":
+            base = os.path.expanduser("~/Library/Application Support/SpoonbillStudio")
+        elif sys.platform == "win32":
+            base = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "SpoonbillStudio")
+        else:
+            base = os.path.expanduser("~/.spoonbill_studio")
+        os.makedirs(base, exist_ok=True)
+        return base
+    except Exception:
+        fallback = os.path.join(tempfile.gettempdir(), "SpoonbillStudio")
+        os.makedirs(fallback, exist_ok=True)
+        return fallback
+
+
+USER_DATA_DIR = get_user_data_dir()
+
 
 def resolve_workspace_root() -> str:
+    if getattr(sys, "frozen", False):
+        return APP_ROOT_DIR
     p = BACKEND_DIR
     for _ in range(6):
-        if os.path.exists(os.path.join(p, "12_Full")) or os.path.exists(os.path.join(p, "NewModels Reinforced")):
+        if os.path.exists(os.path.join(p, "12_Full")) or os.path.exists(os.path.join(p, "NewModels Reinforced")) or os.path.exists(os.path.join(p, "Dataset")):
             return p
         parent = os.path.dirname(p)
         if parent == p:
@@ -262,6 +290,7 @@ def build_model_catalog() -> Dict[str, Dict]:
             "desc": "Model produksi presisi penuh (FP32 ONNX) untuk panorama resolusi tinggi & gerombolan padat.",
             "candidates": [
                 os.path.join(APP_ROOT_DIR, "models", "best_spoonbill_11l.onnx"),
+                os.path.join(USER_DATA_DIR, "models", "best_spoonbill_11l.onnx"),
                 os.path.join(w, "Spoonbill_Studio_Universal", "models", "best_spoonbill_11l.onnx"),
                 os.path.join(w, "PullGit", "BlackFacedSpoonbill", "App", "models", "best_spoonbill_11l.onnx"),
                 os.path.join(w, "NewModels Reinforced", "11l", "best_spoonbill_11l.onnx"),
@@ -281,6 +310,7 @@ def build_model_catalog() -> Dict[str, Dict]:
             "desc": "Model ringan dan super cepat (<60ms) tanpa ketergantungan GPU berat. Sangat direkomendasikan untuk laptop CPU/Baterai.",
             "candidates": [
                 os.path.join(APP_ROOT_DIR, "models", "best_spoonbill_11n.onnx"),
+                os.path.join(USER_DATA_DIR, "models", "best_spoonbill_11n.onnx"),
                 os.path.join(w, "Spoonbill_Studio_Universal", "models", "best_spoonbill_11n.onnx"),
                 os.path.join(w, "PullGit", "BlackFacedSpoonbill", "App", "models", "best_spoonbill_11n.onnx"),
                 os.path.join(w, "NewModels Reinforced", "11n", "best.onnx"),
@@ -440,11 +470,19 @@ def build_model_catalog() -> Dict[str, Dict]:
                 resolved = p
                 break
         item["path"] = resolved
-        item["available"] = resolved is not None
         if resolved:
+            item["available"] = True
             item["size_mb"] = round(os.path.getsize(resolved) / (1024 * 1024), 1)
+            item["on_demand"] = False
+        elif k == "v3_11l_onnx":
+            # In Lite / Slim macOS DMG builds, 11L is downloaded on-demand into USER_DATA_DIR/models
+            item["available"] = True
+            item["size_mb"] = 105.6
+            item["on_demand"] = True
         else:
+            item["available"] = False
             item["size_mb"] = 0.0
+            item["on_demand"] = False
 
     return catalog
 
@@ -463,12 +501,17 @@ class UnifiedSpoonbillEngine:
         self.active_mode = "cpu"
         self.device = "cpu"
 
-        # Setup ONNX providers
+        # Setup ONNX providers:
+        # On macOS (Apple Silicon M1/M2/M3/M4), CPUExecutionProvider uses ARM64 NEON / Accelerate AMX
+        # with <0.15s startup and ~25ms inference, avoiding CoreMLExecutionProvider's 25s dynamic-mask compilation freeze.
         avail = ort.get_available_providers()
-        self.onnx_providers = [
-            p for p in ["CoreMLExecutionProvider", "DmlExecutionProvider", "CUDAExecutionProvider", "CPUExecutionProvider"]
-            if p in avail
-        ] or ["CPUExecutionProvider"]
+        if sys.platform == "darwin":
+            self.onnx_providers = ["CPUExecutionProvider"]
+        else:
+            self.onnx_providers = [
+                p for p in ["DmlExecutionProvider", "CUDAExecutionProvider", "CPUExecutionProvider"]
+                if p in avail
+            ] or ["CPUExecutionProvider"]
 
         print(f"[UnifiedEngine] Initialized in {self.active_mode.upper()} Safe Mode | Hardware: {self.hw_info['status_label']} | ONNX Providers: {self.onnx_providers}")
 
@@ -533,7 +576,7 @@ class UnifiedSpoonbillEngine:
             # - M dan L: diberi highlight/warning menyatakan tidak menyarankan jika di CPU
             recommended = is_nano if is_cpu_mode else True
             cpu_warning = is_cpu_mode and is_large_or_med
-            warning_text = "⚠️ Disarankan NVIDIA GPU (Beban CPU Tinggi)" if cpu_warning else ""
+            warning_text = "[Notice] Disarankan NVIDIA GPU (Beban CPU Tinggi)" if cpu_warning else ""
 
             models.append({
                 "id": m["id"],
@@ -555,17 +598,57 @@ class UnifiedSpoonbillEngine:
             })
         return models
 
+    def _ensure_on_demand_model(self, model_id: str, info: Dict) -> str:
+        """Downloads and reconstructs best_spoonbill_11l.onnx into USER_DATA_DIR/models on demand for Lite builds."""
+        if info.get("path") and os.path.exists(info["path"]):
+            return info["path"]
+        if model_id != "v3_11l_onnx":
+            raise FileNotFoundError(f"ONNX model '{model_id}' not found on disk.")
+
+        import urllib.request
+        target_dir = os.path.join(USER_DATA_DIR, "models")
+        os.makedirs(target_dir, exist_ok=True)
+        target_path = os.path.join(target_dir, "best_spoonbill_11l.onnx")
+        if os.path.exists(target_path) and os.path.getsize(target_path) > 100_000_000:
+            info["path"] = target_path
+            info["on_demand"] = False
+            return target_path
+
+        base_url = "https://raw.githubusercontent.com/Corneliox/BlackFacedSpoonbill/master/App/models/best_spoonbill_11l.onnx"
+        tmp_path = target_path + ".downloading"
+        print(f"[UnifiedEngine] Downloading on-demand 11L model to {target_path}...")
+        try:
+            with open(tmp_path, "wb") as out_f:
+                for part_idx in [1, 2, 3]:
+                    part_url = f"{base_url}.part{part_idx}"
+                    print(f"[UnifiedEngine] Fetching chunk {part_idx}/3: {part_url}...")
+                    req = urllib.request.Request(part_url, headers={"User-Agent": "SpoonbillStudio/4.1"})
+                    with urllib.request.urlopen(req, timeout=60) as resp:
+                        shutil.copyfileobj(resp, out_f)
+            os.replace(tmp_path, target_path)
+            info["path"] = target_path
+            info["on_demand"] = False
+            return target_path
+        except Exception as e:
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+            raise RuntimeError(f"Gagal mengunduh model 11L on-demand ({e}). Gunakan model 11N V3 (ONNX) yang sudah terpasang offline.")
+
     def _get_onnx_session(self, model_id: str) -> ort.InferenceSession:
         if model_id not in self.onnx_sessions:
             info = self.catalog.get(model_id)
             if not info or not info["available"]:
                 raise FileNotFoundError(f"ONNX model '{model_id}' not found.")
+            model_path = self._ensure_on_demand_model(model_id, info)
             opts = ort.SessionOptions()
             opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
             opts.intra_op_num_threads = os.cpu_count() or 4
-            print(f"[UnifiedEngine] Loading ONNX session: {info['name']}...")
+            print(f"[UnifiedEngine] Loading ONNX session: {info['name']} from {model_path}...")
             self.onnx_sessions[model_id] = ort.InferenceSession(
-                info["path"], sess_options=opts, providers=self.onnx_providers
+                model_path, sess_options=opts, providers=self.onnx_providers
             )
         return self.onnx_sessions[model_id]
 
