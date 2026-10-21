@@ -29,7 +29,7 @@ public class SpoonbillNvidiaInstaller : Form
     // Step Panels
     private Panel panelSystemCheck;
     private Panel panelAgreement;
-    private Panel panelOptions;
+    private Panel panelModeAndOptions;
     private Panel panelProgress;
     private Panel panelFinish;
 
@@ -41,15 +41,22 @@ public class SpoonbillNvidiaInstaller : Form
     // Step 2: Agreement Controls
     private Label lblAgreeTitle;
     private Label lblAgreeDesc;
+    private TextBox txtAgreementTerms;
     private RadioButton rbAgree;
     private RadioButton rbDisagree;
-    private Panel pnlWarningBox;
-    private Label lblWarningText;
 
-    // Step 3: Options Controls
+    // Step 3: Installation Mode & Options Controls
     private Label lblOptTitle;
     private Label lblOptDesc;
+    private RadioButton rbModeExpress;
+    private RadioButton rbModeCustom;
+    private Panel pnlCustomOptions;
     private TextBox txtTargetDir;
+    private Button btnBrowseTarget;
+    private Label lblDiskSpace;
+    private CheckBox chkCleanInstall;
+    private CheckBox chkInstallModels;
+    private CheckBox chkInstallDeps;
     private CheckBox chkDesktopShortcut;
     private CheckBox chkStartMenuShortcut;
     private CheckBox chkRegisterUninstaller;
@@ -64,16 +71,18 @@ public class SpoonbillNvidiaInstaller : Form
     private Label lblFinishTitle;
     private Label lblFinishDesc;
     private CheckBox chkLaunchNow;
+    private CheckBox chkOpenFolder;
 
     // Installation Parameters
     private string targetDir;
     private string pythonBinary = null;
+    private bool existingVersionDetected = false;
     private bool isInstalling = false;
 
     public SpoonbillNvidiaInstaller()
     {
         this.Text = "Spoonbill AI Studio V4 — Installation Wizard";
-        this.Size = new Size(720, 500);
+        this.Size = new Size(740, 520);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
         this.MaximizeBox = false;
@@ -95,7 +104,7 @@ public class SpoonbillNvidiaInstaller : Form
     {
         sidebarPanel = new Panel();
         sidebarPanel.Dock = DockStyle.Left;
-        sidebarPanel.Width = 200;
+        sidebarPanel.Width = 205;
         sidebarPanel.BackColor = Color.FromArgb(16, 16, 18);
         this.Controls.Add(sidebarPanel);
 
@@ -117,8 +126,8 @@ public class SpoonbillNvidiaInstaller : Form
 
         string[] steps = new string[] {
             "1. System Check",
-            "2. License & Agreement",
-            "3. Options",
+            "2. User Agreement",
+            "3. Options & Target",
             "4. Installation",
             "5. Finish"
         };
@@ -130,7 +139,7 @@ public class SpoonbillNvidiaInstaller : Form
             lbl.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
             lbl.ForeColor = Color.FromArgb(113, 113, 122);
             lbl.Location = new Point(24, 100 + (i * 36));
-            lbl.Size = new Size(160, 24);
+            lbl.Size = new Size(165, 24);
             sidebarPanel.Controls.Add(lbl);
             stepLabels[i] = lbl;
         }
@@ -150,7 +159,7 @@ public class SpoonbillNvidiaInstaller : Form
         btnBack = new Button();
         btnBack.Text = "< Back";
         btnBack.Size = new Size(84, 32);
-        btnBack.Location = new Point(400, 12);
+        btnBack.Location = new Point(420, 12);
         btnBack.BackColor = Color.FromArgb(39, 39, 42);
         btnBack.ForeColor = Color.FromArgb(228, 228, 231);
         btnBack.FlatStyle = FlatStyle.Flat;
@@ -161,7 +170,7 @@ public class SpoonbillNvidiaInstaller : Form
         btnNext = new Button();
         btnNext.Text = "Next >";
         btnNext.Size = new Size(96, 32);
-        btnNext.Location = new Point(494, 12);
+        btnNext.Location = new Point(514, 12);
         btnNext.BackColor = Color.FromArgb(118, 185, 0);
         btnNext.ForeColor = Color.Black;
         btnNext.FlatStyle = FlatStyle.Flat;
@@ -173,7 +182,7 @@ public class SpoonbillNvidiaInstaller : Form
         btnCancel = new Button();
         btnCancel.Text = "Cancel";
         btnCancel.Size = new Size(84, 32);
-        btnCancel.Location = new Point(600, 12);
+        btnCancel.Location = new Point(620, 12);
         btnCancel.BackColor = Color.FromArgb(39, 39, 42);
         btnCancel.ForeColor = Color.FromArgb(228, 228, 231);
         btnCancel.FlatStyle = FlatStyle.Flat;
@@ -186,7 +195,7 @@ public class SpoonbillNvidiaInstaller : Form
     {
         contentPanel = new Panel();
         contentPanel.Dock = DockStyle.Fill;
-        contentPanel.Padding = new Padding(30, 25, 30, 15);
+        contentPanel.Padding = new Padding(25, 20, 25, 15);
         this.Controls.Add(contentPanel);
 
         // ================= PAGE 0: SYSTEM CHECK =================
@@ -195,18 +204,18 @@ public class SpoonbillNvidiaInstaller : Form
         contentPanel.Controls.Add(panelSystemCheck);
 
         lblSysTitle = new Label();
-        lblSysTitle.Text = "System Compatibility Check";
+        lblSysTitle.Text = "System Compatibility & Environment Scan";
         lblSysTitle.Font = new Font("Segoe UI", 13F, FontStyle.Bold);
         lblSysTitle.ForeColor = Color.White;
-        lblSysTitle.Location = new Point(25, 20);
-        lblSysTitle.Size = new Size(440, 30);
+        lblSysTitle.Location = new Point(20, 16);
+        lblSysTitle.Size = new Size(460, 28);
         panelSystemCheck.Controls.Add(lblSysTitle);
 
         lblSysDesc = new Label();
-        lblSysDesc.Text = "Verifying operating system, hardware capabilities, and Python runtime...";
+        lblSysDesc.Text = "Verifying operating system, hardware resources, and existing installations...";
         lblSysDesc.ForeColor = Color.FromArgb(161, 161, 170);
-        lblSysDesc.Location = new Point(26, 52);
-        lblSysDesc.Size = new Size(440, 25);
+        lblSysDesc.Location = new Point(22, 46);
+        lblSysDesc.Size = new Size(460, 24);
         panelSystemCheck.Controls.Add(lblSysDesc);
 
         txtSysSummary = new TextBox();
@@ -216,123 +225,209 @@ public class SpoonbillNvidiaInstaller : Form
         txtSysSummary.ForeColor = Color.FromArgb(228, 228, 231);
         txtSysSummary.Font = new Font("Consolas", 9F, FontStyle.Regular);
         txtSysSummary.BorderStyle = BorderStyle.FixedSingle;
-        txtSysSummary.Location = new Point(26, 85);
-        txtSysSummary.Size = new Size(440, 250);
+        txtSysSummary.Location = new Point(22, 75);
+        txtSysSummary.Size = new Size(460, 280);
         panelSystemCheck.Controls.Add(txtSysSummary);
 
-        // ================= PAGE 1: AGREEMENT =================
+        // ================= PAGE 1: USER AGREEMENT =================
         panelAgreement = new Panel();
         panelAgreement.Dock = DockStyle.Fill;
         contentPanel.Controls.Add(panelAgreement);
 
         lblAgreeTitle = new Label();
-        lblAgreeTitle.Text = "License & AI Dependencies Agreement";
+        lblAgreeTitle.Text = "End User License & AI Dependencies Agreement";
         lblAgreeTitle.Font = new Font("Segoe UI", 13F, FontStyle.Bold);
         lblAgreeTitle.ForeColor = Color.White;
-        lblAgreeTitle.Location = new Point(25, 20);
-        lblAgreeTitle.Size = new Size(440, 30);
+        lblAgreeTitle.Location = new Point(20, 16);
+        lblAgreeTitle.Size = new Size(460, 28);
         panelAgreement.Controls.Add(lblAgreeTitle);
 
         lblAgreeDesc = new Label();
-        lblAgreeDesc.Text = "Spoonbill AI Studio requires lean Python AI runtime dependencies (ONNX Runtime, FastAPI, OpenCV, Pillow ~50MB) to perform bird segmentation and census.";
+        lblAgreeDesc.Text = "Please review the license terms, data privacy policy, and dependency permissions.";
         lblAgreeDesc.ForeColor = Color.FromArgb(161, 161, 170);
-        lblAgreeDesc.Location = new Point(26, 52);
-        lblAgreeDesc.Size = new Size(440, 40);
+        lblAgreeDesc.Location = new Point(22, 46);
+        lblAgreeDesc.Size = new Size(460, 24);
         panelAgreement.Controls.Add(lblAgreeDesc);
 
+        txtAgreementTerms = new TextBox();
+        txtAgreementTerms.Multiline = true;
+        txtAgreementTerms.ReadOnly = true;
+        txtAgreementTerms.ScrollBars = ScrollBars.Vertical;
+        txtAgreementTerms.BackColor = Color.FromArgb(16, 16, 18);
+        txtAgreementTerms.ForeColor = Color.FromArgb(212, 212, 216);
+        txtAgreementTerms.Font = new Font("Consolas", 8F, FontStyle.Regular);
+        txtAgreementTerms.BorderStyle = BorderStyle.FixedSingle;
+        txtAgreementTerms.Location = new Point(22, 72);
+        txtAgreementTerms.Size = new Size(460, 180);
+        txtAgreementTerms.Text =
+            "BLACK-FACED SPOONBILL AI STUDIO V4 — LICENSE & USAGE AGREEMENT" + Environment.NewLine +
+            "=========================================================================" + Environment.NewLine + Environment.NewLine +
+            "1. LICENSE GRANT & CONSERVATION PURPOSE" + Environment.NewLine +
+            "This software is provided under the Creative Commons Attribution-NonCommercial-" + Environment.NewLine +
+            "ShareAlike 4.0 International License (CC BY-NC-SA 4.0). You are permitted to" + Environment.NewLine +
+            "use, adapt, and run the studio for non-commercial ecological research, academic" + Environment.NewLine +
+            "study, and Black-faced Spoonbill (Platalea minor) wildlife census." + Environment.NewLine +
+            "Commercial monetization or sale of this application without explicit permission" + Environment.NewLine +
+            "from the original authors is strictly prohibited." + Environment.NewLine + Environment.NewLine +
+            "2. AI DEPENDENCIES & AUTOMATED PIP EXECUTION" + Environment.NewLine +
+            "By agreeing, you authorize the setup wizard to verify your local Python 3" + Environment.NewLine +
+            "installation and run 'pip install -r requirements_lean.txt' to acquire runtime" + Environment.NewLine +
+            "libraries (onnxruntime, fastapi, uvicorn, opencv-python-headless, pillow, numpy)." + Environment.NewLine +
+            "Total download footprint is approximately 50 MB with zero PyTorch bloat." + Environment.NewLine + Environment.NewLine +
+            "3. LOCAL DATA PRIVACY GUARANTEE" + Environment.NewLine +
+            "All deep learning inference, image processing, and census calculations execute" + Environment.NewLine +
+            "100% locally on your device. No user photographs, surveillance feeds, or survey" + Environment.NewLine +
+            "data are uploaded to external cloud endpoints." + Environment.NewLine + Environment.NewLine +
+            "4. DEPENDENCY REQUIREMENT & CANCELLATION" + Environment.NewLine +
+            "Spoonbill AI Studio cannot operate without its neural inference backend." + Environment.NewLine +
+            "If you select 'I do not accept', installation will be cancelled immediately.";
+        panelAgreement.Controls.Add(txtAgreementTerms);
+
         rbAgree = new RadioButton();
-        rbAgree.Text = "Agree and automatically install required AI dependencies (Recommended)\nSetup will verify and run 'pip install -r requirements_lean.txt'.";
+        rbAgree.Text = "I accept the license terms and agree to install required AI dependencies (Recommended)";
         rbAgree.Checked = true;
         rbAgree.ForeColor = Color.FromArgb(228, 228, 231);
         rbAgree.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-        rbAgree.Location = new Point(26, 105);
-        rbAgree.Size = new Size(440, 48);
+        rbAgree.Location = new Point(22, 260);
+        rbAgree.Size = new Size(460, 40);
         panelAgreement.Controls.Add(rbAgree);
 
         rbDisagree = new RadioButton();
-        rbDisagree.Text = "Do not agree to install dependencies (Cancel installation and exit)\nSetup will abort without installing application files.";
+        rbDisagree.Text = "I do not accept the terms (Cancel installation and exit setup immediately)";
         rbDisagree.ForeColor = Color.FromArgb(248, 113, 113);
         rbDisagree.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
-        rbDisagree.Location = new Point(26, 160);
-        rbDisagree.Size = new Size(440, 45);
+        rbDisagree.Location = new Point(22, 302);
+        rbDisagree.Size = new Size(460, 36);
         panelAgreement.Controls.Add(rbDisagree);
 
-        pnlWarningBox = new Panel();
-        pnlWarningBox.BackColor = Color.FromArgb(35, 20, 20);
-        pnlWarningBox.Location = new Point(26, 220);
-        pnlWarningBox.Size = new Size(440, 100);
-        pnlWarningBox.Paint += (s, e) => {
-            e.Graphics.DrawRectangle(new Pen(Color.FromArgb(239, 68, 68), 1), 0, 0, pnlWarningBox.Width - 1, pnlWarningBox.Height - 1);
-        };
-        panelAgreement.Controls.Add(pnlWarningBox);
-
-        lblWarningText = new Label();
-        lblWarningText.Text = "NOTICE:\nIf you choose not to install the required AI dependencies, installation cannot continue because Spoonbill AI Studio cannot run without its local neural inference engine.\nSelecting 'Do not agree' will cancel setup and exit immediately.";
-        lblWarningText.ForeColor = Color.FromArgb(254, 202, 202);
-        lblWarningText.Font = new Font("Segoe UI", 8.5F, FontStyle.Regular);
-        lblWarningText.Location = new Point(14, 12);
-        lblWarningText.Size = new Size(410, 75);
-        pnlWarningBox.Controls.Add(lblWarningText);
-
-        // ================= PAGE 2: OPTIONS =================
-        panelOptions = new Panel();
-        panelOptions.Dock = DockStyle.Fill;
-        contentPanel.Controls.Add(panelOptions);
+        // ================= PAGE 2: MODE & OPTIONS =================
+        panelModeAndOptions = new Panel();
+        panelModeAndOptions.Dock = DockStyle.Fill;
+        contentPanel.Controls.Add(panelModeAndOptions);
 
         lblOptTitle = new Label();
-        lblOptTitle.Text = "Installation Options";
+        lblOptTitle.Text = "Installation Mode & Configuration Options";
         lblOptTitle.Font = new Font("Segoe UI", 13F, FontStyle.Bold);
         lblOptTitle.ForeColor = Color.White;
-        lblOptTitle.Location = new Point(25, 20);
-        lblOptTitle.Size = new Size(440, 30);
-        panelOptions.Controls.Add(lblOptTitle);
+        lblOptTitle.Location = new Point(20, 16);
+        lblOptTitle.Size = new Size(460, 28);
+        panelModeAndOptions.Controls.Add(lblOptTitle);
 
         lblOptDesc = new Label();
-        lblOptDesc.Text = "Configure installation destination and program shortcuts.";
+        lblOptDesc.Text = "Choose between automatic express setup or custom component selection.";
         lblOptDesc.ForeColor = Color.FromArgb(161, 161, 170);
-        lblOptDesc.Location = new Point(26, 52);
-        lblOptDesc.Size = new Size(440, 25);
-        panelOptions.Controls.Add(lblOptDesc);
+        lblOptDesc.Location = new Point(22, 46);
+        lblOptDesc.Size = new Size(460, 24);
+        panelModeAndOptions.Controls.Add(lblOptDesc);
 
-        Label lblTarget = new Label();
-        lblTarget.Text = "Destination Folder:";
-        lblTarget.ForeColor = Color.FromArgb(228, 228, 231);
-        lblTarget.Location = new Point(26, 88);
-        lblTarget.Size = new Size(200, 20);
-        panelOptions.Controls.Add(lblTarget);
+        rbModeExpress = new RadioButton();
+        rbModeExpress.Text = "Express Installation (Recommended for most users)\nInstalls all components, ONNX models, dependencies, and shortcuts automatically.";
+        rbModeExpress.Checked = true;
+        rbModeExpress.ForeColor = Color.FromArgb(228, 228, 231);
+        rbModeExpress.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+        rbModeExpress.Location = new Point(22, 75);
+        rbModeExpress.Size = new Size(460, 42);
+        rbModeExpress.CheckedChanged += (s, e) => ToggleCustomOptions(!rbModeExpress.Checked);
+        panelModeAndOptions.Controls.Add(rbModeExpress);
+
+        rbModeCustom = new RadioButton();
+        rbModeCustom.Text = "Custom / Advanced Installation (For researchers & developers)\nConfigure custom installation directory, clean install, and selective components.";
+        rbModeCustom.ForeColor = Color.FromArgb(212, 212, 216);
+        rbModeCustom.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
+        rbModeCustom.Location = new Point(22, 120);
+        rbModeCustom.Size = new Size(460, 42);
+        panelModeAndOptions.Controls.Add(rbModeCustom);
+
+        pnlCustomOptions = new Panel();
+        pnlCustomOptions.Location = new Point(22, 165);
+        pnlCustomOptions.Size = new Size(460, 205);
+        pnlCustomOptions.Enabled = false;
+        panelModeAndOptions.Controls.Add(pnlCustomOptions);
+
+        Label lblDest = new Label();
+        lblDest.Text = "Destination Directory:";
+        lblDest.ForeColor = Color.FromArgb(212, 212, 216);
+        lblDest.Location = new Point(0, 0);
+        lblDest.Size = new Size(200, 18);
+        pnlCustomOptions.Controls.Add(lblDest);
 
         txtTargetDir = new TextBox();
         txtTargetDir.Text = targetDir;
-        txtTargetDir.ReadOnly = true;
         txtTargetDir.BackColor = Color.FromArgb(16, 16, 18);
-        txtTargetDir.ForeColor = Color.FromArgb(161, 161, 170);
-        txtTargetDir.Location = new Point(26, 110);
-        txtTargetDir.Size = new Size(440, 23);
-        panelOptions.Controls.Add(txtTargetDir);
+        txtTargetDir.ForeColor = Color.FromArgb(228, 228, 231);
+        txtTargetDir.Location = new Point(0, 20);
+        txtTargetDir.Size = new Size(365, 23);
+        txtTargetDir.TextChanged += (s, e) => { targetDir = txtTargetDir.Text; UpdateDiskSpace(); };
+        pnlCustomOptions.Controls.Add(txtTargetDir);
+
+        btnBrowseTarget = new Button();
+        btnBrowseTarget.Text = "Browse...";
+        btnBrowseTarget.Size = new Size(85, 25);
+        btnBrowseTarget.Location = new Point(375, 19);
+        btnBrowseTarget.BackColor = Color.FromArgb(39, 39, 42);
+        btnBrowseTarget.ForeColor = Color.FromArgb(228, 228, 231);
+        btnBrowseTarget.FlatStyle = FlatStyle.Flat;
+        btnBrowseTarget.FlatAppearance.BorderSize = 0;
+        btnBrowseTarget.Click += OnBrowseTargetClick;
+        pnlCustomOptions.Controls.Add(btnBrowseTarget);
+
+        lblDiskSpace = new Label();
+        lblDiskSpace.Text = "Required space: ~550 MB | Available space: Calculating...";
+        lblDiskSpace.ForeColor = Color.FromArgb(161, 161, 170);
+        lblDiskSpace.Font = new Font("Segoe UI", 8F);
+        lblDiskSpace.Location = new Point(0, 46);
+        lblDiskSpace.Size = new Size(460, 18);
+        pnlCustomOptions.Controls.Add(lblDiskSpace);
+
+        chkCleanInstall = new CheckBox();
+        chkCleanInstall.Text = "Perform Clean Installation (Safely purge previous build files before install)";
+        chkCleanInstall.Checked = true;
+        chkCleanInstall.ForeColor = Color.FromArgb(246, 130, 31);
+        chkCleanInstall.Location = new Point(0, 68);
+        chkCleanInstall.Size = new Size(460, 22);
+        pnlCustomOptions.Controls.Add(chkCleanInstall);
+
+        chkInstallModels = new CheckBox();
+        chkInstallModels.Text = "Install Bundled ONNX Models (YOLO11 Nano & Large neural weights)";
+        chkInstallModels.Checked = true;
+        chkInstallModels.ForeColor = Color.FromArgb(228, 228, 231);
+        chkInstallModels.Location = new Point(0, 92);
+        chkInstallModels.Size = new Size(460, 22);
+        pnlCustomOptions.Controls.Add(chkInstallModels);
+
+        chkInstallDeps = new CheckBox();
+        chkInstallDeps.Text = "Install AI Dependencies via pip (onnxruntime, fastapi, uvicorn, opencv)";
+        chkInstallDeps.Checked = true;
+        chkInstallDeps.ForeColor = Color.FromArgb(228, 228, 231);
+        chkInstallDeps.Location = new Point(0, 116);
+        chkInstallDeps.Size = new Size(460, 22);
+        pnlCustomOptions.Controls.Add(chkInstallDeps);
 
         chkDesktopShortcut = new CheckBox();
-        chkDesktopShortcut.Text = "Create Desktop shortcut (Spoonbill AI Studio.lnk)";
+        chkDesktopShortcut.Text = "Create Desktop shortcut";
         chkDesktopShortcut.Checked = true;
         chkDesktopShortcut.ForeColor = Color.FromArgb(228, 228, 231);
-        chkDesktopShortcut.Location = new Point(26, 160);
-        chkDesktopShortcut.Size = new Size(400, 24);
-        panelOptions.Controls.Add(chkDesktopShortcut);
+        chkDesktopShortcut.Location = new Point(0, 140);
+        chkDesktopShortcut.Size = new Size(210, 22);
+        pnlCustomOptions.Controls.Add(chkDesktopShortcut);
 
         chkStartMenuShortcut = new CheckBox();
         chkStartMenuShortcut.Text = "Create Start Menu shortcut";
         chkStartMenuShortcut.Checked = true;
         chkStartMenuShortcut.ForeColor = Color.FromArgb(228, 228, 231);
-        chkStartMenuShortcut.Location = new Point(26, 195);
-        chkStartMenuShortcut.Size = new Size(400, 24);
-        panelOptions.Controls.Add(chkStartMenuShortcut);
+        chkStartMenuShortcut.Location = new Point(230, 140);
+        chkStartMenuShortcut.Size = new Size(210, 22);
+        pnlCustomOptions.Controls.Add(chkStartMenuShortcut);
 
         chkRegisterUninstaller = new CheckBox();
-        chkRegisterUninstaller.Text = "Register Uninstaller in Windows Installed Apps (Control Panel)";
+        chkRegisterUninstaller.Text = "Register Uninstaller in Windows Installed Apps (Control Panel / Settings)";
         chkRegisterUninstaller.Checked = true;
         chkRegisterUninstaller.ForeColor = Color.FromArgb(228, 228, 231);
-        chkRegisterUninstaller.Location = new Point(26, 230);
-        chkRegisterUninstaller.Size = new Size(400, 24);
-        panelOptions.Controls.Add(chkRegisterUninstaller);
+        chkRegisterUninstaller.Location = new Point(0, 164);
+        chkRegisterUninstaller.Size = new Size(460, 22);
+        pnlCustomOptions.Controls.Add(chkRegisterUninstaller);
+
+        UpdateDiskSpace();
 
         // ================= PAGE 3: PROGRESS =================
         panelProgress = new Panel();
@@ -343,20 +438,20 @@ public class SpoonbillNvidiaInstaller : Form
         lblProgTitle.Text = "Installing Spoonbill AI Studio V4...";
         lblProgTitle.Font = new Font("Segoe UI", 13F, FontStyle.Bold);
         lblProgTitle.ForeColor = Color.White;
-        lblProgTitle.Location = new Point(25, 20);
-        lblProgTitle.Size = new Size(440, 30);
+        lblProgTitle.Location = new Point(20, 16);
+        lblProgTitle.Size = new Size(460, 28);
         panelProgress.Controls.Add(lblProgTitle);
 
         lblProgStatus = new Label();
         lblProgStatus.Text = "Preparing installation package...";
         lblProgStatus.ForeColor = Color.FromArgb(161, 161, 170);
-        lblProgStatus.Location = new Point(26, 52);
-        lblProgStatus.Size = new Size(440, 20);
+        lblProgStatus.Location = new Point(22, 46);
+        lblProgStatus.Size = new Size(460, 20);
         panelProgress.Controls.Add(lblProgStatus);
 
         progressBar = new ProgressBar();
-        progressBar.Location = new Point(26, 80);
-        progressBar.Size = new Size(440, 16);
+        progressBar.Location = new Point(22, 70);
+        progressBar.Size = new Size(460, 16);
         progressBar.Style = ProgressBarStyle.Continuous;
         panelProgress.Controls.Add(progressBar);
 
@@ -367,8 +462,8 @@ public class SpoonbillNvidiaInstaller : Form
         logBox.BackColor = Color.FromArgb(14, 14, 16);
         logBox.ForeColor = Color.FromArgb(161, 161, 170);
         logBox.Font = new Font("Consolas", 8.5F, FontStyle.Regular);
-        logBox.Location = new Point(26, 110);
-        logBox.Size = new Size(440, 225);
+        logBox.Location = new Point(22, 98);
+        logBox.Size = new Size(460, 255);
         logBox.BorderStyle = BorderStyle.FixedSingle;
         panelProgress.Controls.Add(logBox);
 
@@ -381,15 +476,15 @@ public class SpoonbillNvidiaInstaller : Form
         lblFinishTitle.Text = "Installation Complete";
         lblFinishTitle.Font = new Font("Segoe UI", 13F, FontStyle.Bold);
         lblFinishTitle.ForeColor = Color.White;
-        lblFinishTitle.Location = new Point(25, 20);
-        lblFinishTitle.Size = new Size(440, 30);
+        lblFinishTitle.Location = new Point(20, 16);
+        lblFinishTitle.Size = new Size(460, 28);
         panelFinish.Controls.Add(lblFinishTitle);
 
         lblFinishDesc = new Label();
-        lblFinishDesc.Text = "Spoonbill AI Studio V4 has been installed successfully on your computer.\n\nAll core components, ONNX neural inference models, and application shortcuts have been configured.";
+        lblFinishDesc.Text = "Spoonbill AI Studio V4 has been installed successfully on your system.\n\nAll selected neural components, inference models, and Windows integration options are configured and ready for research use.";
         lblFinishDesc.ForeColor = Color.FromArgb(161, 161, 170);
-        lblFinishDesc.Location = new Point(26, 60);
-        lblFinishDesc.Size = new Size(440, 70);
+        lblFinishDesc.Location = new Point(22, 54);
+        lblFinishDesc.Size = new Size(460, 60);
         panelFinish.Controls.Add(lblFinishDesc);
 
         chkLaunchNow = new CheckBox();
@@ -397,9 +492,68 @@ public class SpoonbillNvidiaInstaller : Form
         chkLaunchNow.Checked = true;
         chkLaunchNow.ForeColor = Color.FromArgb(118, 185, 0);
         chkLaunchNow.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-        chkLaunchNow.Location = new Point(26, 145);
+        chkLaunchNow.Location = new Point(22, 130);
         chkLaunchNow.Size = new Size(400, 26);
         panelFinish.Controls.Add(chkLaunchNow);
+
+        chkOpenFolder = new CheckBox();
+        chkOpenFolder.Text = "Open application installation folder";
+        chkOpenFolder.Checked = false;
+        chkOpenFolder.ForeColor = Color.FromArgb(212, 212, 216);
+        chkOpenFolder.Location = new Point(22, 162);
+        chkOpenFolder.Size = new Size(400, 24);
+        panelFinish.Controls.Add(chkOpenFolder);
+    }
+
+    private void ToggleCustomOptions(bool enabled)
+    {
+        pnlCustomOptions.Enabled = enabled;
+        if (!enabled)
+        {
+            // Reset to Express defaults
+            string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            targetDir = Path.Combine(localApp, "Programs", "Spoonbill_Studio");
+            txtTargetDir.Text = targetDir;
+            chkCleanInstall.Checked = true;
+            chkInstallModels.Checked = true;
+            chkInstallDeps.Checked = true;
+            chkDesktopShortcut.Checked = true;
+            chkStartMenuShortcut.Checked = true;
+            chkRegisterUninstaller.Checked = true;
+        }
+    }
+
+    private void OnBrowseTargetClick(object sender, EventArgs e)
+    {
+        using (FolderBrowserDialog fbd = new FolderBrowserDialog())
+        {
+            fbd.Description = "Select Destination Folder for Spoonbill AI Studio V4";
+            fbd.SelectedPath = Directory.Exists(targetDir) ? targetDir : Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (fbd.ShowDialog(this) == DialogResult.OK)
+            {
+                targetDir = fbd.SelectedPath;
+                txtTargetDir.Text = targetDir;
+                UpdateDiskSpace();
+            }
+        }
+    }
+
+    private void UpdateDiskSpace()
+    {
+        try
+        {
+            string root = Path.GetPathRoot(targetDir);
+            if (!string.IsNullOrEmpty(root) && Directory.Exists(root))
+            {
+                DriveInfo d = new DriveInfo(root);
+                long freeMb = d.AvailableFreeSpace / (1024 * 1024);
+                lblDiskSpace.Text = "Required: ~550 MB | Available on " + root + ": " + freeMb + " MB";
+            }
+        }
+        catch
+        {
+            lblDiskSpace.Text = "Required space: ~550 MB";
+        }
     }
 
     private void SwitchStep(int step)
@@ -427,7 +581,7 @@ public class SpoonbillNvidiaInstaller : Form
 
         panelSystemCheck.Visible = (step == 0);
         panelAgreement.Visible = (step == 1);
-        panelOptions.Visible = (step == 2);
+        panelModeAndOptions.Visible = (step == 2);
         panelProgress.Visible = (step == 3);
         panelFinish.Visible = (step == 4);
 
@@ -474,29 +628,42 @@ public class SpoonbillNvidiaInstaller : Form
         txtSysSummary.AppendText("  Spoonbill AI Studio V4 — System Compatibility Scan  " + Environment.NewLine);
         txtSysSummary.AppendText("======================================================" + Environment.NewLine + Environment.NewLine);
 
-        // OS Check
+        // 1. Operating System
         string osName = Environment.OSVersion.ToString();
-        txtSysSummary.AppendText("[OK] Operating System : " + osName + " (64-bit compatible)" + Environment.NewLine);
+        txtSysSummary.AppendText("[OK] Operating System   : " + osName + " (64-bit)" + Environment.NewLine);
 
-        // CPU & Memory
+        // 2. Hardware Resources
         int cores = Environment.ProcessorCount;
-        txtSysSummary.AppendText("[OK] Processor Cores  : " + cores + " Logical Cores detected" + Environment.NewLine);
+        txtSysSummary.AppendText("[OK] Processor Cores    : " + cores + " Logical Cores detected" + Environment.NewLine);
 
-        // Python Check
-        pythonBinary = FindPythonBinary();
-        if (!string.IsNullOrEmpty(pythonBinary))
+        // 3. Previous Version Detection
+        existingVersionDetected = Directory.Exists(targetDir) && File.Exists(Path.Combine(targetDir, "Spoonbill_Studio.exe"));
+        if (existingVersionDetected)
         {
-            txtSysSummary.AppendText("[OK] Python Runtime   : Detected at " + pythonBinary + Environment.NewLine);
-            txtSysSummary.AppendText("     Status           : Ready for automated AI dependencies installation." + Environment.NewLine);
+            txtSysSummary.AppendText("[FOUND] Existing Build  : Previous installation detected at" + Environment.NewLine);
+            txtSysSummary.AppendText("        Directory       : " + targetDir + Environment.NewLine);
+            txtSysSummary.AppendText("        Clean Install   : Recommended (Setup will cleanly purge old files)." + Environment.NewLine);
         }
         else
         {
-            txtSysSummary.AppendText("[WARNING] Python      : Python 3.10+ was not detected on system PATH." + Environment.NewLine);
-            txtSysSummary.AppendText("          Notice      : Setup can install packages if Python is installed," + Environment.NewLine);
-            txtSysSummary.AppendText("                        or you may install Python from https://www.python.org/" + Environment.NewLine);
+            txtSysSummary.AppendText("[OK] Existing Build     : No conflicting previous installation detected." + Environment.NewLine);
         }
 
-        txtSysSummary.AppendText(Environment.NewLine + "Ready to proceed. Click 'Next >' to continue.");
+        // 4. Python Runtime Environment
+        pythonBinary = FindPythonBinary();
+        if (!string.IsNullOrEmpty(pythonBinary))
+        {
+            txtSysSummary.AppendText("[OK] Python Runtime     : Detected at " + pythonBinary + Environment.NewLine);
+            txtSysSummary.AppendText("     Environment Status : Ready for automated AI dependencies installation." + Environment.NewLine);
+        }
+        else
+        {
+            txtSysSummary.AppendText("[WARNING] Python Status : Python 3.10+ was not detected on system PATH." + Environment.NewLine);
+            txtSysSummary.AppendText("          Recommendation: Install Python 3.10+ from https://www.python.org/" + Environment.NewLine);
+            txtSysSummary.AppendText("                          (Ensure 'Add python.exe to PATH' is checked)." + Environment.NewLine);
+        }
+
+        txtSysSummary.AppendText(Environment.NewLine + "System scan completed. Click 'Next >' to review User Agreement.");
     }
 
     private void OnNextClick(object sender, EventArgs e)
@@ -511,10 +678,10 @@ public class SpoonbillNvidiaInstaller : Form
             {
                 DialogResult res = MessageBox.Show(
                     this,
-                    "You have selected not to install the required AI dependencies.\n\n" +
-                    "Spoonbill AI Studio cannot function without its neural inference engine.\n\n" +
+                    "You selected not to agree to the terms or install required dependencies.\n\n" +
+                    "Spoonbill AI Studio cannot run without its local neural inference engine.\n\n" +
                     "Do you want to cancel the installation now?",
-                    "Cancel Installation?",
+                    "Cancel Setup?",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning
                 );
@@ -540,6 +707,11 @@ public class SpoonbillNvidiaInstaller : Form
         }
         else if (currentStep == 4)
         {
+            if (chkOpenFolder.Checked && Directory.Exists(targetDir))
+            {
+                try { Process.Start("explorer.exe", targetDir); } catch {}
+            }
+
             if (chkLaunchNow.Checked)
             {
                 string exePath = Path.Combine(targetDir, "Spoonbill_Studio.exe");
@@ -563,11 +735,11 @@ public class SpoonbillNvidiaInstaller : Form
     {
         if (isInstalling)
         {
-            MessageBox.Show(this, "Installation is currently in progress. Please wait.", "Setup Busy", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "Installation is currently in progress. Please wait for completion.", "Setup Busy", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
-        DialogResult res = MessageBox.Show(this, "Are you sure you want to cancel the setup wizard?", "Exit Setup", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+        DialogResult res = MessageBox.Show(this, "Are you sure you want to cancel the installation wizard?", "Exit Setup", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
         if (res == DialogResult.Yes)
         {
             Application.Exit();
@@ -578,14 +750,43 @@ public class SpoonbillNvidiaInstaller : Form
     {
         try
         {
-            UpdateStatus("Setting target: " + targetDir, 5);
+            UpdateStatus("Setting target directory: " + targetDir, 5);
             AppendLog("Preparing destination directory: " + targetDir);
+
+            // Clean Install if requested or express
+            bool doClean = rbModeExpress.Checked || chkCleanInstall.Checked;
+            if (doClean && Directory.Exists(targetDir))
+            {
+                UpdateStatus("Cleaning previous installation files...", 10);
+                AppendLog("Terminating any running Spoonbill Studio processes...");
+                KillRunningProcesses();
+
+                AppendLog("Safely purging old build files from target directory...");
+                try
+                {
+                    foreach (string file in Directory.GetFiles(targetDir, "*", SearchOption.AllDirectories))
+                    {
+                        try { File.SetAttributes(file, FileAttributes.Normal); File.Delete(file); } catch {}
+                    }
+                    foreach (string dir in Directory.GetDirectories(targetDir))
+                    {
+                        try { Directory.Delete(dir, true); } catch {}
+                    }
+                    AppendLog("Clean installation directory prepared.");
+                }
+                catch (Exception cex)
+                {
+                    AppendLog("  [Notice] Clean purge message: " + cex.Message);
+                }
+            }
+
             if (!Directory.Exists(targetDir))
             {
                 Directory.CreateDirectory(targetDir);
             }
 
-            UpdateStatus("Extracting core studio files, models, and UI...", 15);
+            // Extraction
+            UpdateStatus("Extracting core studio files, models, and UI...", 25);
             AppendLog("Extracting embedded application payload...");
             Assembly asm = Assembly.GetExecutingAssembly();
             using (Stream s = asm.GetManifestResourceStream("Payload"))
@@ -602,13 +803,14 @@ public class SpoonbillNvidiaInstaller : Form
                 ZipFile.ExtractToDirectory(tempZip, targetDir);
                 try { File.Delete(tempZip); } catch {}
             }
-            AppendLog("Payload extraction complete.");
-            SetProgress(45);
+            AppendLog("Application binaries and resources extracted successfully.");
+            SetProgress(50);
 
-            // Dependency Installation
-            if (rbAgree.Checked)
+            // AI Dependencies
+            bool doDeps = rbModeExpress.Checked || chkInstallDeps.Checked;
+            if (doDeps)
             {
-                UpdateStatus("Checking for Python environment...", 50);
+                UpdateStatus("Checking for Python runtime...", 55);
                 string pyCmd = FindPythonBinary();
                 if (string.IsNullOrEmpty(pyCmd))
                 {
@@ -625,8 +827,8 @@ public class SpoonbillNvidiaInstaller : Form
 
                     if (File.Exists(reqFile))
                     {
-                        UpdateStatus("Installing AI dependencies via pip (onnxruntime, fastapi, uvicorn)...", 60);
-                        AppendLog("Executing: " + pyCmd + " -m pip install -r " + Path.GetFileName(reqFile));
+                        UpdateStatus("Installing AI dependencies via pip (onnxruntime, fastapi, uvicorn)...", 65);
+                        AppendLog("Running pip dependency installer: " + pyCmd + " -m pip install -r " + Path.GetFileName(reqFile));
                         try
                         {
                             ProcessStartInfo pipPsi = new ProcessStartInfo();
@@ -671,15 +873,18 @@ public class SpoonbillNvidiaInstaller : Form
             SetProgress(80);
 
             // Shortcuts
-            if (chkDesktopShortcut.Checked || chkStartMenuShortcut.Checked)
+            bool doDesktop = rbModeExpress.Checked || chkDesktopShortcut.Checked;
+            bool doStart = rbModeExpress.Checked || chkStartMenuShortcut.Checked;
+            if (doDesktop || doStart)
             {
                 UpdateStatus("Creating program shortcuts...", 85);
                 AppendLog("Generating desktop and start menu shortcuts...");
-                CreateShortcuts(targetDir, chkDesktopShortcut.Checked, chkStartMenuShortcut.Checked);
+                CreateShortcuts(targetDir, doDesktop, doStart);
             }
 
             // Uninstaller Registration
-            if (chkRegisterUninstaller.Checked)
+            bool doUninst = rbModeExpress.Checked || chkRegisterUninstaller.Checked;
+            if (doUninst)
             {
                 UpdateStatus("Registering Windows Uninstaller...", 95);
                 AppendLog("Registering Spoonbill AI Studio in Windows Control Panel / Settings...");
@@ -688,7 +893,7 @@ public class SpoonbillNvidiaInstaller : Form
 
             SetProgress(100);
             UpdateStatus("Installation complete.", 100);
-            AppendLog("All components installed successfully.");
+            AppendLog("All selected components installed successfully.");
 
             Thread.Sleep(600);
             this.Invoke((MethodInvoker)delegate {
@@ -736,6 +941,18 @@ public class SpoonbillNvidiaInstaller : Form
                 logBox.AppendText("[" + stamp + "] " + message + Environment.NewLine);
             });
         }
+    }
+
+    private void KillRunningProcesses()
+    {
+        try
+        {
+            foreach (Process p in Process.GetProcessesByName("Spoonbill_Studio"))
+            {
+                try { p.Kill(); p.WaitForExit(1500); } catch {}
+            }
+        }
+        catch {}
     }
 
     private string FindPythonBinary()
