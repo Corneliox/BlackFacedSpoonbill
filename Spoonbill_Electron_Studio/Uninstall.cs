@@ -21,7 +21,7 @@ public class SpoonbillUninstaller : Form
     private Label titleHeader;
     private Label descLabel;
     private ProgressBar progressBar;
-    private TextBox logBox;
+    private RichTextBox logBox;
     private Button btnAction;
     private Button btnCancel;
 
@@ -148,16 +148,16 @@ public class SpoonbillUninstaller : Form
         progressBar.Visible = false;
         contentPanel.Controls.Add(progressBar);
 
-        logBox = new TextBox();
+        logBox = new RichTextBox();
         logBox.Multiline = true;
         logBox.ReadOnly = true;
-        logBox.ScrollBars = ScrollBars.Vertical;
+        logBox.ScrollBars = RichTextBoxScrollBars.Vertical;
         logBox.BackColor = Color.FromArgb(18, 18, 20);
-        logBox.ForeColor = Color.FromArgb(161, 161, 170);
+        logBox.ForeColor = Color.FromArgb(220, 220, 230);
         logBox.Font = new Font("Consolas", 8.5F, FontStyle.Regular);
         logBox.Location = new Point(32, 145);
         logBox.Size = new Size(375, 150);
-        logBox.BorderStyle = BorderStyle.FixedSingle;
+        logBox.BorderStyle = BorderStyle.None;
         logBox.Visible = false;
         contentPanel.Controls.Add(logBox);
     }
