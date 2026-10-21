@@ -64,6 +64,11 @@ if (fs.existsSync(path.join(ROOT_DIR, 'models'))) {
   copyRecursiveSync(path.join(ROOT_DIR, 'models'), path.join(APP_DEST, 'models'));
 }
 
+if (fs.existsSync(path.join(ROOT_DIR, 'requirements_lean.txt'))) {
+  fs.copyFileSync(path.join(ROOT_DIR, 'requirements_lean.txt'), path.join(APP_DEST, 'requirements_lean.txt'));
+  fs.copyFileSync(path.join(ROOT_DIR, 'requirements_lean.txt'), path.join(OUTPUT_DIR, 'requirements_lean.txt'));
+}
+
 // Add launcher scripts
 console.log('[Packager] Creating helper scripts (shortcut creator, launcher)...');
 

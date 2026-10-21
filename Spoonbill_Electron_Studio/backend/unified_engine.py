@@ -22,53 +22,67 @@ from typing import List, Dict, Tuple, Optional, Union
 import cv2
 import numpy as np
 import onnxruntime as ort
-import torch
-import torch.nn as nn
+try:
+    import torch
+    import torch.nn as nn
+    HAS_TORCH = True
+except ImportError:
+    torch = None
+    nn = None
+    HAS_TORCH = False
 
 # =====================================================================
 # 1. COORDINATE ATTENTION MODULE & GLOBAL ULTRALYTICS REGISTRATION
 # =====================================================================
-class CoordAtt(nn.Module):
-    """
-    Coordinate Attention block with dynamic channel adaptation for YOLOv11/12 scales.
-    Decomposes 2D spatial pooling into horizontal and vertical directional 1D encoding.
-    """
-    def __init__(self, *args, reduction=32, **kwargs):
-        super().__init__()
-        self.reduction = reduction
-        self.pool_h = nn.AdaptiveAvgPool2d((None, 1))
-        self.pool_w = nn.AdaptiveAvgPool2d((1, None))
-        self.act = nn.SiLU()
-        self.conv1 = None
-        self.bn1 = None
-        self.conv_h = None
-        self.conv_w = None
-        self.built = False
+if HAS_TORCH:
+    class CoordAtt(nn.Module):
+        """
+        Coordinate Attention block with dynamic channel adaptation for YOLOv11/12 scales.
+        Decomposes 2D spatial pooling into horizontal and vertical directional 1D encoding.
+        """
+        def __init__(self, *args, reduction=32, **kwargs):
+            super().__init__()
+            self.reduction = reduction
+            self.pool_h = nn.AdaptiveAvgPool2d((None, 1))
+            self.pool_w = nn.AdaptiveAvgPool2d((1, None))
+            self.act = nn.SiLU()
+            self.conv1 = None
+            self.bn1 = None
+            self.conv_h = None
+            self.conv_w = None
+            self.built = False
 
-    def _build(self, c, device):
-        mip = max(8, c // self.reduction)
-        self.conv1 = nn.Conv2d(c, mip, kernel_size=1, stride=1, padding=0).to(device)
-        self.bn1 = nn.BatchNorm2d(mip).to(device)
-        self.conv_h = nn.Conv2d(mip, c, kernel_size=1, stride=1, padding=0).to(device)
-        self.conv_w = nn.Conv2d(mip, c, kernel_size=1, stride=1, padding=0).to(device)
-        self.built = True
+        def _build(self, c, device):
+            mip = max(8, c // self.reduction)
+            self.conv1 = nn.Conv2d(c, mip, kernel_size=1, stride=1, padding=0).to(device)
+            self.bn1 = nn.BatchNorm2d(mip).to(device)
+            self.conv_h = nn.Conv2d(mip, c, kernel_size=1, stride=1, padding=0).to(device)
+            self.conv_w = nn.Conv2d(mip, c, kernel_size=1, stride=1, padding=0).to(device)
+            self.built = True
 
-    def forward(self, x):
-        if not self.built:
-            self._build(x.size(1), x.device)
-        identity = x
-        n, c, h, w = x.size()
-        x_h = self.pool_h(x)
-        x_w = self.pool_w(x).permute(0, 1, 3, 2)
-        y = torch.cat([x_h, x_w], dim=2)
-        y = self.act(self.bn1(self.conv1(y)))
-        x_h, x_w = torch.split(y, [h, w], dim=2)
-        x_w = x_w.permute(0, 1, 3, 2)
-        return identity * self.conv_w(x_w).sigmoid() * self.conv_h(x_h).sigmoid()
+        def forward(self, x):
+            if not self.built:
+                self._build(x.size(1), x.device)
+            identity = x
+            n, c, h, w = x.size()
+            x_h = self.pool_h(x)
+            x_w = self.pool_w(x).permute(0, 1, 3, 2)
+            y = torch.cat([x_h, x_w], dim=2)
+            y = self.act(self.bn1(self.conv1(y)))
+            x_h, x_w = torch.split(y, [h, w], dim=2)
+            x_w = x_w.permute(0, 1, 3, 2)
+            return identity * self.conv_w(x_w).sigmoid() * self.conv_h(x_h).sigmoid()
+else:
+    class CoordAtt:
+        """Fallback CoordAtt dummy when running in pure ONNX Runtime mode without PyTorch."""
+        def __init__(self, *args, **kwargs):
+            pass
 
 
 def register_coord_att():
     """Registers CoordAtt across all namespaces required by PyTorch pickle & Ultralytics."""
+    if not HAS_TORCH:
+        return
     setattr(builtins, "CoordAtt", CoordAtt)
     for mod_name in ["__main__", "__mp_main__"]:
         if mod_name in sys.modules:
@@ -556,6 +570,8 @@ class UnifiedSpoonbillEngine:
         return self.onnx_sessions[model_id]
 
     def _get_torch_model(self, model_id: str):
+        if not HAS_TORCH:
+            raise RuntimeError(f"PyTorch is not installed in this environment. Please run ONNX models or install PyTorch to use '{model_id}'.")
         register_coord_att()
         if model_id not in self.torch_models:
             info = self.catalog.get(model_id)
@@ -1007,6 +1023,13 @@ class UnifiedSpoonbillEngine:
         and blends a Jet colormap heatmap onto the original image.
         """
         h, w = img.shape[:2]
+        if not HAS_TORCH:
+            out = img.copy()
+            cv2.rectangle(out, (10, 10), (450, 52), (15, 20, 28), -1)
+            cv2.rectangle(out, (10, 10), (450, 52), (0, 215, 255), 1, cv2.LINE_AA)
+            cv2.putText(out, "Grad-CAM requires PyTorch installation", (20, 36), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1, cv2.LINE_AA)
+            return out
+
         info = self.catalog.get(model_id)
 
         # If user selected an ONNX model, map it to its corresponding PyTorch model for layer hooks

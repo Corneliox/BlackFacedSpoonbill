@@ -4,5 +4,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   isElectron: true,
   openExportFolder: (folderPath) => ipcRenderer.invoke('electron:open-export-folder', folderPath),
   getAppInfo: () => ipcRenderer.invoke('electron:get-app-info'),
-  setTitleBarColors: (bgColor, symbolColor) => ipcRenderer.invoke('electron:set-titlebar-colors', { bgColor, symbolColor })
+  setTitleBarColors: (bgColor, symbolColor) => ipcRenderer.invoke('electron:set-titlebar-colors', { bgColor, symbolColor }),
+  getStartupStatus: () => ipcRenderer.invoke('electron:get-startup-status'),
+  installDependencies: () => ipcRenderer.invoke('electron:install-dependencies'),
+  retryBackend: () => ipcRenderer.invoke('electron:retry-backend')
 });

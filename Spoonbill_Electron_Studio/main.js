@@ -5,6 +5,7 @@
 
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { spawn, execSync } = require('child_process');
 const net = require('net');
 const http = require('http');
@@ -77,6 +78,29 @@ function findPythonBinary() {
       return cmd;
     } catch (e) {}
   }
+  if (process.platform === 'win32') {
+    const localApp = process.env.LOCALAPPDATA || '';
+    const pyProg = path.join(localApp, 'Programs', 'Python');
+    if (fs.existsSync(pyProg)) {
+      try {
+        const dirs = fs.readdirSync(pyProg);
+        for (const d of dirs) {
+          const cand = path.join(pyProg, d, 'python.exe');
+          if (fs.existsSync(cand)) return cand;
+        }
+      } catch (e) {}
+    }
+    const progFiles = process.env.ProgramFiles || 'C:\\Program Files';
+    if (fs.existsSync(progFiles)) {
+      try {
+        const dirs = fs.readdirSync(progFiles).filter(d => d.toLowerCase().startsWith('python'));
+        for (const d of dirs) {
+          const cand = path.join(progFiles, d, 'python.exe');
+          if (fs.existsSync(cand)) return cand;
+        }
+      } catch (e) {}
+    }
+  }
   return null;
 }
 
@@ -85,7 +109,7 @@ function startPythonBackend(port) {
   const pythonCmd = findPythonBinary();
 
   if (!pythonCmd) {
-    backendStartupError = 'Python 3 executable not found on system PATH. Please install Python 3.10+ with ONNX / PyTorch.';
+    backendStartupError = 'Python 3 executable not found on system PATH. Please install Python 3.10+ from python.org with "Add to PATH" checked.';
     console.error(`[Electron] ${backendStartupError}`);
     return;
   }
@@ -115,8 +139,8 @@ function startPythonBackend(port) {
   pythonProcess.stderr.on('data', (data) => {
     const str = String(data);
     process.stderr.write(`[Python AI] ${str}`);
-    if (str.includes('Error') || str.includes('Traceback') || str.includes('ModuleNotFoundError')) {
-      backendStartupError = str.slice(0, 250);
+    if (str.includes('Error') || str.includes('Traceback') || str.includes('ModuleNotFoundError') || str.includes('No module named')) {
+      backendStartupError = str.slice(0, 300);
     }
   });
 
@@ -128,7 +152,9 @@ function startPythonBackend(port) {
   pythonProcess.on('exit', (code) => {
     console.log(`[Electron] Python backend exited with code ${code}`);
     if (code !== 0 && code !== null) {
-      backendStartupError = `Python backend exited with code ${code}. Check dependencies (onnxruntime, fastapi, uvicorn, opencv-python).`;
+      if (!backendStartupError) {
+        backendStartupError = `Python backend exited with code ${code}. Check dependencies (onnxruntime, fastapi, uvicorn, opencv-python).`;
+      }
     }
     pythonProcess = null;
   });
@@ -178,7 +204,7 @@ function getSplashHtml(port) {
           flex-direction: column;
           align-items: center;
           box-shadow: 0 20px 48px rgba(0,0,0,0.6);
-          max-width: 480px;
+          max-width: 490px;
           text-align: center;
         }
         .mark {
@@ -219,10 +245,41 @@ function getSplashHtml(port) {
           font-size: 11px;
           color: #FCA5A5;
           text-align: left;
-          max-height: 100px;
+          max-height: 120px;
           overflow-y: auto;
           display: none;
+          word-break: break-word;
+          line-height: 1.4;
         }
+        .action-row {
+          margin-top: 16px;
+          display: none;
+          gap: 10px;
+          justify-content: center;
+          width: 100%;
+        }
+        .btn {
+          font-size: 11px;
+          font-weight: 600;
+          padding: 8px 14px;
+          border-radius: 6px;
+          cursor: pointer;
+          border: none;
+          outline: none;
+          transition: all 0.15s ease;
+        }
+        .btn-primary {
+          background: #F6821F;
+          color: #FFFFFF;
+        }
+        .btn-primary:hover { background: #EA580C; }
+        .btn-secondary {
+          background: #27272A;
+          color: #D4D4D8;
+          border: 1px solid rgba(255,255,255,0.12);
+        }
+        .btn-secondary:hover { background: #3F3F46; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
       </style>
     </head>
     <body>
@@ -236,9 +293,13 @@ function getSplashHtml(port) {
         </div>
         <h1>Spoonbill Studio</h1>
         <span class="sub">Platalea minor AI Census &amp; Research</span>
-        <div class="track"><div class="bar"></div></div>
+        <div class="track" id="track-bar"><div class="bar"></div></div>
         <p class="status" id="status-text">Starting AI Engine (CPU Safe Mode)...</p>
         <div class="error-box" id="error-box"></div>
+        <div class="action-row" id="action-row">
+          <button class="btn btn-primary" id="btn-install-deps">Install Missing Dependencies (pip)</button>
+          <button class="btn btn-secondary" id="btn-retry">Retry</button>
+        </div>
       </div>
 
       <script>
@@ -246,27 +307,106 @@ function getSplashHtml(port) {
           const port = ${port};
           const targetUrl = 'http://127.0.0.1:' + port + '/';
           let tries = 0;
+          let isChecking = true;
+          let statusCheckerInterval = null;
+
+          const statusEl = document.getElementById('status-text');
+          const errorBox = document.getElementById('error-box');
+          const actionRow = document.getElementById('action-row');
+          const btnInstall = document.getElementById('btn-install-deps');
+          const btnRetry = document.getElementById('btn-retry');
+
+          async function checkStartupStatus() {
+            if (!window.electronAPI || !window.electronAPI.getStartupStatus) return;
+            try {
+              const st = await window.electronAPI.getStartupStatus();
+              if (st && st.error) {
+                isChecking = false;
+                errorBox.style.display = 'block';
+                errorBox.textContent = st.error;
+                statusEl.textContent = 'Backend halted. Missing Python dependencies or configuration.';
+                actionRow.style.display = 'flex';
+              }
+            } catch (e) {}
+          }
+
+          statusCheckerInterval = setInterval(checkStartupStatus, 1000);
+
+          btnInstall.addEventListener('click', async () => {
+            btnInstall.disabled = true;
+            btnRetry.disabled = true;
+            btnInstall.textContent = 'Installing packages...';
+            statusEl.textContent = 'Running pip install for required AI dependencies... Please wait (~1-2 min).';
+            errorBox.style.display = 'none';
+
+            try {
+              const res = await window.electronAPI.installDependencies();
+              if (res && res.success) {
+                statusEl.textContent = 'Dependencies installed! Restarting backend engine...';
+                await window.electronAPI.retryBackend();
+                setTimeout(() => {
+                  actionRow.style.display = 'none';
+                  btnInstall.disabled = false;
+                  btnRetry.disabled = false;
+                  btnInstall.textContent = 'Install Missing Dependencies (pip)';
+                  isChecking = true;
+                  tries = 0;
+                  check();
+                }, 1000);
+              } else {
+                errorBox.style.display = 'block';
+                errorBox.textContent = (res && res.error) ? res.error : 'Failed to install dependencies.';
+                statusEl.textContent = 'Installation encountered an error.';
+                btnInstall.disabled = false;
+                btnRetry.disabled = false;
+                btnInstall.textContent = 'Install Missing Dependencies (pip)';
+              }
+            } catch (err) {
+              errorBox.style.display = 'block';
+              errorBox.textContent = err.message;
+              btnInstall.disabled = false;
+              btnRetry.disabled = false;
+              btnInstall.textContent = 'Install Missing Dependencies (pip)';
+            }
+          });
+
+          btnRetry.addEventListener('click', async () => {
+            btnRetry.disabled = true;
+            statusEl.textContent = 'Restarting Python backend...';
+            errorBox.style.display = 'none';
+            actionRow.style.display = 'none';
+            await window.electronAPI.retryBackend();
+            setTimeout(() => {
+              btnRetry.disabled = false;
+              isChecking = true;
+              tries = 0;
+              check();
+            }, 1000);
+          });
+
           function check() {
+            if (!isChecking) return;
             tries++;
             fetch('http://127.0.0.1:' + port + '/api/health')
               .then(res => {
                 if (res.ok) {
-                  const statusEl = document.getElementById('status-text');
+                  if (statusCheckerInterval) clearInterval(statusCheckerInterval);
                   if (statusEl) statusEl.textContent = 'Engine online. Opening studio...';
                   setTimeout(() => {
                     window.location.href = targetUrl;
                   }, 250);
                 } else {
-                  setTimeout(check, 600);
+                  if (isChecking) setTimeout(check, 600);
                 }
               })
               .catch(() => {
-                const statusEl = document.getElementById('status-text');
-                if (statusEl && tries > 12) {
+                if (!isChecking) return;
+                if (statusEl && tries > 10) {
                   statusEl.textContent = 'Connecting to backend engine (' + tries + 's)...';
                 }
-                if (statusEl && tries > 30) {
+                if (statusEl && tries > 25) {
                   statusEl.innerHTML = 'Still initializing backend...<br><span style="font-size:10px;color:#71717A">Verifying Python &amp; model dependencies</span>';
+                  checkStartupStatus();
                 }
                 setTimeout(check, 600);
               });
@@ -338,14 +478,70 @@ ipcMain.handle('electron:get-app-info', async () => {
   };
 });
 
-ipcMain.handle('electron:set-titlebar-colors', async (_event, { bgColor, symbolColor }) => {
-  if (mainWindow && !mainWindow.isDestroyed() && typeof mainWindow.setTitleBarOverlay === 'function') {
-    mainWindow.setTitleBarOverlay({
-      color: bgColor,
-      symbolColor: symbolColor,
-      height: 52
-    });
+ipcMain.handle('electron:get-startup-status', async () => {
+  return {
+    running: !!pythonProcess,
+    error: backendStartupError,
+    port: backendPort,
+    pythonCmd: findPythonBinary()
+  };
+});
+
+ipcMain.handle('electron:install-dependencies', async () => {
+  const pythonCmd = findPythonBinary();
+  if (!pythonCmd) {
+    return {
+      success: false,
+      error: 'Python 3 executable not found on system PATH. Please install Python 3.10+ from https://www.python.org/ with "Add to PATH" checked.'
+    };
   }
+
+  const possibleReqPaths = [
+    path.join(__dirname, 'requirements_lean.txt'),
+    path.join(__dirname, 'resources', 'app', 'requirements_lean.txt'),
+    path.join(path.dirname(process.execPath), 'requirements_lean.txt'),
+    path.join(path.dirname(process.execPath), 'resources', 'app', 'requirements_lean.txt')
+  ];
+  const reqPath = possibleReqPaths.find(p => fs.existsSync(p));
+
+  const packages = [
+    'onnxruntime>=1.18.0',
+    'opencv-python-headless>=4.8.0',
+    'numpy>=1.24.0',
+    'fastapi>=0.110.0',
+    'uvicorn>=0.28.0',
+    'python-multipart>=0.0.9',
+    'pillow>=10.0.0'
+  ];
+  const args = reqPath ? ['-m', 'pip', 'install', '-r', reqPath] : ['-m', 'pip', 'install', ...packages];
+
+  return new Promise((resolve) => {
+    const proc = spawn(pythonCmd, args, {
+      cwd: __dirname,
+      windowsHide: true
+    });
+    let out = '';
+    proc.stdout.on('data', d => { out += String(d); });
+    proc.stderr.on('data', d => { out += String(d); });
+    proc.on('close', code => {
+      if (code === 0) {
+        backendStartupError = null;
+        resolve({ success: true, log: out.slice(-500) });
+      } else {
+        resolve({ success: false, error: `pip install exited with code ${code}. ${out.slice(-300)}` });
+      }
+    });
+    proc.on('error', err => {
+      resolve({ success: false, error: err.message });
+    });
+  });
+});
+
+ipcMain.handle('electron:retry-backend', async () => {
+  stopPythonBackend();
+  backendStartupError = null;
+  startPythonBackend(backendPort);
+  return { success: true };
 });
 
 app.whenReady().then(createMainWindow);

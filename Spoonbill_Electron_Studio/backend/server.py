@@ -32,8 +32,11 @@ if BACKEND_DIR not in sys.path:
 from unified_engine import UnifiedSpoonbillEngine, CoordAtt, register_coord_att, APP_ROOT_DIR, WORKSPACE_ROOT
 
 # Explicitly bind CoordAtt to __main__ for torch.load unpickling
-setattr(sys.modules["__main__"], "CoordAtt", CoordAtt)
-register_coord_att()
+try:
+    setattr(sys.modules["__main__"], "CoordAtt", CoordAtt)
+    register_coord_att()
+except Exception:
+    pass
 
 app = FastAPI(
     title="Spoonbill Electron Studio V4 API",
