@@ -59,6 +59,11 @@ copyRecursiveSync(path.join(ROOT_DIR, 'renderer'), path.join(APP_DEST, 'renderer
 console.log('[Packager] Copying backend (FastAPI + Unified Engine)...');
 copyRecursiveSync(path.join(ROOT_DIR, 'backend'), path.join(APP_DEST, 'backend'));
 
+if (fs.existsSync(path.join(ROOT_DIR, 'models'))) {
+  console.log('[Packager] Copying bundled AI models...');
+  copyRecursiveSync(path.join(ROOT_DIR, 'models'), path.join(APP_DEST, 'models'));
+}
+
 // Add launcher scripts
 console.log('[Packager] Creating helper scripts (shortcut creator, launcher)...');
 

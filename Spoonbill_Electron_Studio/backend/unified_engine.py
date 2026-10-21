@@ -14,6 +14,9 @@ import sys
 import time
 import math
 import builtins
+import platform
+import subprocess
+import shutil
 from typing import List, Dict, Tuple, Optional, Union
 
 import cv2
@@ -105,6 +108,128 @@ def resolve_workspace_root() -> str:
 WORKSPACE_ROOT = resolve_workspace_root()
 
 
+def probe_system_hardware() -> Dict:
+    """Probes system hardware (CPU, NVIDIA, AMD, Intel, Apple Silicon) and PyTorch CUDA environment."""
+    system_os = platform.system()  # 'Windows', 'Darwin', 'Linux'
+    arch = platform.machine().lower()
+    is_mac = system_os == "Darwin"
+    is_apple_silicon = is_mac and ("arm" in arch or "m" in platform.processor().lower())
+
+    cpu_name = platform.processor() or platform.machine()
+    cpu_cores = os.cpu_count() or 4
+
+    has_torch = False
+    cuda_available = False
+    cuda_device_name = None
+    cuda_vram_gb = 0.0
+    cuda_compute = None
+    cuda_version = None
+    mps_available = False
+
+    try:
+        import torch
+        has_torch = True
+        cuda_available = torch.cuda.is_available()
+        if cuda_available and torch.cuda.device_count() > 0:
+            cuda_device_name = torch.cuda.get_device_name(0)
+            cuda_vram_gb = round(torch.cuda.get_device_properties(0).total_memory / (1024**3), 2)
+            cuda_compute = f"{torch.cuda.get_device_capability(0)[0]}.{torch.cuda.get_device_capability(0)[1]}"
+            cuda_version = getattr(torch.version, "cuda", None)
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            mps_available = True
+    except Exception:
+        pass
+
+    physical_gpus = []
+    has_nvidia_hardware = False
+    has_amd_hardware = False
+    has_intel_gpu = False
+
+    try:
+        if system_os == "Windows":
+            cmd = ["powershell", "-NoProfile", "-Command", "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+            if res.returncode == 0:
+                for line in res.stdout.strip().splitlines():
+                    name = line.strip()
+                    if name:
+                        physical_gpus.append(name)
+                        low = name.lower()
+                        if any(k in low for k in ["nvidia", "geforce", "quadro", "rtx", "gtx", "tesla"]):
+                            has_nvidia_hardware = True
+                        elif any(k in low for k in ["amd", "radeon"]):
+                            has_amd_hardware = True
+                        elif "intel" in low:
+                            has_intel_gpu = True
+        elif is_mac:
+            cmd = ["system_profiler", "SPDisplaysDataType"]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+            if res.returncode == 0:
+                for line in res.stdout.splitlines():
+                    if "Chipset Model:" in line:
+                        chip = line.split(":", 1)[1].strip()
+                        physical_gpus.append(chip)
+        elif system_os == "Linux":
+            cmd = ["lspci"]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=3)
+            if res.returncode == 0:
+                for line in res.stdout.splitlines():
+                    if any(k in line.lower() for k in ["vga", "3d", "display"]):
+                        gpu_item = line.split(":", 2)[-1].strip()
+                        physical_gpus.append(gpu_item)
+                        if "nvidia" in gpu_item.lower():
+                            has_nvidia_hardware = True
+    except Exception:
+        pass
+
+    if cuda_available:
+        status_id = "nvidia_cuda_ready"
+        status_label = "NVIDIA CUDA Acceleration"
+        badge_color = "#10B981"
+        desc = f"NVIDIA GPU terdeteksi & CUDA aktif ({cuda_device_name}, {cuda_vram_gb} GB VRAM). Akselerasi penuh aktif untuk semua skala model (N, S, M, L)."
+    elif has_nvidia_hardware and not cuda_available:
+        status_id = "nvidia_no_cuda"
+        status_label = "Hardware NVIDIA Terdeteksi (PyTorch CUDA Belum Terpasang)"
+        badge_color = "#F59E0B"
+        desc = f"Hardware NVIDIA terdeteksi ({', '.join(physical_gpus)}), namun PyTorch berjalan dalam mode CPU. Untuk mengaktifkan akselerasi GPU, install PyTorch dengan dukungan CUDA."
+    elif mps_available or is_apple_silicon:
+        status_id = "apple_silicon"
+        status_label = "Apple Silicon Metal Acceleration"
+        badge_color = "#3B82F6"
+        desc = "Apple Silicon SoC terdeteksi. Menggunakan akselerasi terpadu CPU + Metal Performance Shaders (MPS)."
+    else:
+        status_id = "cpu_only"
+        status_label = "CPU Safe Mode"
+        badge_color = "#71717A"
+        gpu_str = (", ".join(physical_gpus)) if physical_gpus else "Integrated Graphics / Standard CPU"
+        desc = f"Perangkat berjalan dalam mode CPU aman ({gpu_str}). Sangat direkomendasikan menggunakan model Nano (11N) untuk kecepatan instan (<60ms)."
+
+    return {
+        "system_os": system_os,
+        "arch": arch,
+        "is_mac": is_mac,
+        "is_apple_silicon": is_apple_silicon,
+        "cpu_name": cpu_name,
+        "cpu_cores": cpu_cores,
+        "physical_gpus": physical_gpus,
+        "has_nvidia_hardware": has_nvidia_hardware,
+        "has_amd_hardware": has_amd_hardware,
+        "has_intel_gpu": has_intel_gpu,
+        "has_torch": has_torch,
+        "cuda_available": cuda_available,
+        "cuda_device_name": cuda_device_name,
+        "cuda_vram_gb": cuda_vram_gb,
+        "cuda_compute": cuda_compute,
+        "cuda_version": cuda_version,
+        "mps_available": mps_available,
+        "status_id": status_id,
+        "status_label": status_label,
+        "badge_color": badge_color,
+        "can_enable_gpu": bool(cuda_available or mps_available),
+        "description": desc
+    }
+
+
 def build_model_catalog() -> Dict[str, Dict]:
     """Builds the complete registry of trained models across Phases 1-4."""
     w = WORKSPACE_ROOT
@@ -122,6 +247,7 @@ def build_model_catalog() -> Dict[str, Dict]:
             "badge": "High Accuracy Panorama",
             "desc": "Model produksi presisi penuh (FP32 ONNX) untuk panorama resolusi tinggi & gerombolan padat.",
             "candidates": [
+                os.path.join(APP_ROOT_DIR, "models", "best_spoonbill_11l.onnx"),
                 os.path.join(w, "Spoonbill_Studio_Universal", "models", "best_spoonbill_11l.onnx"),
                 os.path.join(w, "PullGit", "BlackFacedSpoonbill", "App", "models", "best_spoonbill_11l.onnx"),
                 os.path.join(w, "NewModels Reinforced", "11l", "best_spoonbill_11l.onnx"),
@@ -138,8 +264,9 @@ def build_model_catalog() -> Dict[str, Dict]:
             "mask_map50": 0.9199,
             "box_prec": 0.8383,
             "badge": "Ultra-Fast CPU/Edge",
-            "desc": "Model ringan dan super cepat (<60ms) tanpa ketergantungan GPU berat.",
+            "desc": "Model ringan dan super cepat (<60ms) tanpa ketergantungan GPU berat. Sangat direkomendasikan untuk laptop CPU/Baterai.",
             "candidates": [
+                os.path.join(APP_ROOT_DIR, "models", "best_spoonbill_11n.onnx"),
                 os.path.join(w, "Spoonbill_Studio_Universal", "models", "best_spoonbill_11n.onnx"),
                 os.path.join(w, "PullGit", "BlackFacedSpoonbill", "App", "models", "best_spoonbill_11n.onnx"),
                 os.path.join(w, "NewModels Reinforced", "11n", "best.onnx"),
@@ -316,7 +443,11 @@ class UnifiedSpoonbillEngine:
         self.catalog = build_model_catalog()
         self.onnx_sessions: Dict[str, ort.InferenceSession] = {}
         self.torch_models: Dict[str, object] = {}
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.hw_info = probe_system_hardware()
+
+        # Always start in CPU Safe Mode by default unless user explicitly activates GPU
+        self.active_mode = "cpu"
+        self.device = "cpu"
 
         # Setup ONNX providers
         avail = ort.get_available_providers()
@@ -325,28 +456,90 @@ class UnifiedSpoonbillEngine:
             if p in avail
         ] or ["CPUExecutionProvider"]
 
-        print(f"[UnifiedEngine] Ready | PyTorch Device: {self.device.upper()} | ONNX Providers: {self.onnx_providers}")
+        print(f"[UnifiedEngine] Initialized in {self.active_mode.upper()} Safe Mode | Hardware: {self.hw_info['status_label']} | ONNX Providers: {self.onnx_providers}")
+
+    def switch_hardware_mode(self, requested_mode: str) -> Dict:
+        """Dynamically switches between CPU Safe Mode and GPU Acceleration (NVIDIA CUDA / Apple Metal)."""
+        req = requested_mode.lower()
+        if req in ["cuda", "gpu", "nvidia"]:
+            if not self.hw_info.get("cuda_available") and not self.hw_info.get("mps_available"):
+                return {
+                    "success": False,
+                    "active_mode": self.active_mode,
+                    "device": self.device,
+                    "message": "Akselerasi NVIDIA CUDA tidak terdeteksi pada perangkat ini. Sistem tetap berjalan dalam CPU Safe Mode.",
+                    "hw_info": self.hw_info
+                }
+            self.active_mode = "cuda" if self.hw_info.get("cuda_available") else "mps"
+            self.device = "cuda" if self.hw_info.get("cuda_available") else "mps"
+            for mid, m in self.torch_models.items():
+                try:
+                    if hasattr(m, "to"):
+                        m.to(self.device)
+                except Exception:
+                    pass
+            print(f"[UnifiedEngine] Hardware Mode Switched to GPU: {self.device.upper()}")
+            return {
+                "success": True,
+                "active_mode": self.active_mode,
+                "device": self.device,
+                "message": f"Akselerasi {self.device.upper()} berhasil diaktifkan.",
+                "hw_info": self.hw_info
+            }
+        else:
+            self.active_mode = "cpu"
+            self.device = "cpu"
+            for mid, m in self.torch_models.items():
+                try:
+                    if hasattr(m, "to"):
+                        m.to("cpu")
+                except Exception:
+                    pass
+            print("[UnifiedEngine] Hardware Mode Switched to CPU Safe Mode")
+            return {
+                "success": True,
+                "active_mode": self.active_mode,
+                "device": self.device,
+                "message": "Sistem beralih ke CPU Safe Mode.",
+                "hw_info": self.hw_info
+            }
 
     def get_available_models(self) -> List[Dict]:
-        return [
-            {
+        models = []
+        is_cpu_mode = self.active_mode == "cpu"
+        for m in self.catalog.values():
+            if not m["available"]:
+                continue
+            scale = m.get("scale", "N")
+            is_nano = scale == "N"
+            is_large_or_med = scale in ["M", "L"]
+
+            # Recommendation rules per user specification:
+            # - CPU mode: disarankan untuk n model saja
+            # - M dan L: diberi highlight/warning menyatakan tidak menyarankan jika di CPU
+            recommended = is_nano if is_cpu_mode else True
+            cpu_warning = is_cpu_mode and is_large_or_med
+            warning_text = "⚠️ Disarankan NVIDIA GPU (Beban CPU Tinggi)" if cpu_warning else ""
+
+            models.append({
                 "id": m["id"],
                 "name": m["name"],
                 "short_name": m["short_name"],
                 "phase": m["phase"],
                 "backend": m["backend"].upper(),
-                "scale": m["scale"],
+                "scale": scale,
                 "params": m["params"],
                 "size_mb": m["size_mb"],
                 "mask_map50": m["mask_map50"],
                 "box_prec": m["box_prec"],
                 "badge": m["badge"],
                 "desc": m["desc"],
-                "available": m["available"]
-            }
-            for m in self.catalog.values()
-            if m["available"]
-        ]
+                "available": m["available"],
+                "recommended": recommended,
+                "cpu_warning": cpu_warning,
+                "warning_text": warning_text
+            })
+        return models
 
     def _get_onnx_session(self, model_id: str) -> ort.InferenceSession:
         if model_id not in self.onnx_sessions:

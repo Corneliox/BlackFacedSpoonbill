@@ -36,8 +36,14 @@
         </div>
       </div>
 
-      <!-- TOP ACTIONS -->
+      <!-- TOP ACTIONS & ACCELERATOR PILL -->
       <div class="topbar-right no-drag">
+        <button class="ps-hw-pill" id="btn-open-hw-modal" title="Periksa status akselerasi GPU / CPU">
+          <span class="hw-dot dot-cpu" id="hw-dot"></span>
+          <span class="hw-label" id="hw-label">CPU Safe Mode</span>
+          <span class="hw-tag" id="hw-tag">Check</span>
+        </button>
+
         <label class="ps-btn ghost upload-label" title="Buka gambar lokal (Ctrl+O)">
           <input type="file" id="file-input" accept="image/*" multiple hidden>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -178,6 +184,9 @@
             <span class="badge-text" id="badge-tech">27.6M · ONNX FP32</span>
             <span class="badge-tag" id="badge-target">Crowds &amp; Panorama</span>
           </div>
+          <div id="model-warning-container" style="display: none; margin-top: 6px;">
+            <span class="model-badge-warn" id="model-warning-badge">⚠️ Disarankan NVIDIA GPU (Beban CPU Tinggi)</span>
+          </div>
         </div>
 
         <!-- 3. PRIMARY CONTROLS (CONFIDENCE & PRESETS) -->
@@ -265,6 +274,67 @@
       </div>
     </footer>
 
+  </div>
+
+  <!-- 4. HARDWARE ACCELERATION INSPECTION MODAL -->
+  <div class="modal-backdrop" id="hw-modal" style="display: none;">
+    <div class="modal-card hw-modal-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-kicker">CROSS-DEVICE ENGINE ACCELERATOR</span>
+          <h2 class="modal-title">Hardware &amp; Acceleration Inspector</h2>
+        </div>
+        <button class="modal-close" id="btn-close-hw-modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="hw-summary-banner" id="hw-summary-banner">
+          <div class="hw-status-icon" id="hw-status-icon">💻</div>
+          <div class="hw-status-info">
+            <h4 id="hw-status-title">Detecting Hardware Environment...</h4>
+            <p id="hw-status-desc">Scanning GPU vendors, driver version, and CUDA runtimes.</p>
+          </div>
+        </div>
+
+        <div class="hw-grid">
+          <div class="hw-item">
+            <span class="hw-label">Operating System</span>
+            <span class="hw-val" id="hw-val-os">—</span>
+          </div>
+          <div class="hw-item">
+            <span class="hw-label">Processor (CPU)</span>
+            <span class="hw-val" id="hw-val-cpu">—</span>
+          </div>
+          <div class="hw-item">
+            <span class="hw-label">Detected GPU(s)</span>
+            <span class="hw-val" id="hw-val-gpus">—</span>
+          </div>
+          <div class="hw-item">
+            <span class="hw-label">NVIDIA CUDA Runtime</span>
+            <span class="hw-val" id="hw-val-cuda">—</span>
+          </div>
+          <div class="hw-item">
+            <span class="hw-label">Active Engine Mode</span>
+            <span class="hw-val" id="hw-val-mode">—</span>
+          </div>
+          <div class="hw-item">
+            <span class="hw-label">Recommended Model</span>
+            <span class="hw-val" id="hw-val-rec">11N Nano (Ultra-Fast)</span>
+          </div>
+        </div>
+
+        <div class="hw-guidance-box" id="hw-guidance-box">
+          <p id="hw-guidance-text">
+            <strong>Mode Standar (CPU Safe Mode):</strong> Perangkat Anda dioptimalkan untuk menjalankan model <strong>11N Nano (ONNX)</strong> dengan kecepatan &lt;60ms tanpa ketergantungan GPU berat. Untuk model Medium (M) dan Large (L), disarankan menggunakan NVIDIA GPU dengan CUDA untuk menghindari latensi tinggi.
+          </p>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="ps-btn ghost" id="btn-set-cpu-mode">Tetap di CPU Safe Mode</button>
+        <button class="ps-btn primary" id="btn-set-cuda-mode" disabled>Aktifkan NVIDIA CUDA Mode</button>
+      </div>
+    </div>
   </div>
 
   <script src="/renderer/app.js"></script>

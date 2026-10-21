@@ -69,12 +69,12 @@ jobs:
           cd App
           mkdir dist_release
           # 1. Build Standalone 1-File Executable (.exe ready to run)
-          pyinstaller --noconfirm --onefile --windowed --name "Spoonbill_AI_Studio_v3.0.1_Windows_x64" --add-data "static;static" --add-data "models;models" desktop_app.py
-          Move-Item "dist/Spoonbill_AI_Studio_v3.0.1_Windows_x64.exe" "dist_release/" -Force
+          pyinstaller --noconfirm --onefile --windowed --name "Spoonbill_Studio_v4.0.0_DirectRun_Windows_x64" --add-data "static;static" --add-data "models;models" desktop_app.py
+          Move-Item "dist/Spoonbill_Studio_v4.0.0_DirectRun_Windows_x64.exe" "dist_release/" -Force
 
           # 2. Build Onedir Folder & ZIP
           pyinstaller --noconfirm --onedir --windowed --name "Spoonbill_AI_Studio" --add-data "static;static" --add-data "models;models" desktop_app.py
-          Compress-Archive -Path "dist/Spoonbill_AI_Studio/*" -DestinationPath "dist_release/Spoonbill_AI_Studio_v3.0.1_Windows_x64_Portable.zip" -Force
+          Compress-Archive -Path "dist/Spoonbill_AI_Studio/*" -DestinationPath "dist_release/Spoonbill_Studio_v4.0.0_DirectRun_Windows_x64_Portable.zip" -Force
 
       # ── Build macOS Intel .DMG ───────────────────────────────────────────────
       - name: Build macOS Intel .DMG
@@ -86,7 +86,7 @@ jobs:
           mkdir -p dmg_tmp
           cp -r dist/Spoonbill_AI_Studio.app dmg_tmp/
           ln -s /Applications dmg_tmp/Applications
-          hdiutil create -volname "Spoonbill AI Studio" -srcfolder dmg_tmp -ov -format UDZO "dist_release/Spoonbill_AI_Studio_v3.0.1_macOS_Intel_x64.dmg"
+          hdiutil create -volname "Spoonbill AI Studio" -srcfolder dmg_tmp -ov -format UDZO "dist_release/Spoonbill_Studio_v4.0.0_macOS_Intel_x64.dmg"
 
       # ── Build macOS Apple Silicon .DMG ───────────────────────────────────────
       - name: Build macOS Apple Silicon .DMG
@@ -98,7 +98,7 @@ jobs:
           mkdir -p dmg_tmp
           cp -r dist/Spoonbill_AI_Studio.app dmg_tmp/
           ln -s /Applications dmg_tmp/Applications
-          hdiutil create -volname "Spoonbill AI Studio" -srcfolder dmg_tmp -ov -format UDZO "dist_release/Spoonbill_AI_Studio_v3.0.1_macOS_AppleSilicon_ARM64.dmg"
+          hdiutil create -volname "Spoonbill AI Studio" -srcfolder dmg_tmp -ov -format UDZO "dist_release/Spoonbill_Studio_v4.0.0_macOS_AppleSilicon_ARM64.dmg"
 
       # ── Build Linux Installer & Universal Suite ──────────────────────────────
       - name: Build Linux Installer (.tar.gz) & Universal Portable (.zip)
@@ -108,9 +108,9 @@ jobs:
           mkdir -p dist_release
           chmod +x Install_Linux_App.sh Install_Mac_App.command
           # 1. Linux Installer Package (.tar.gz)
-          tar -czvf dist_release/Spoonbill_AI_Studio_v4.0.0_Linux_x64.tar.gz --exclude="dist*" --exclude="__pycache__*" --exclude="runs*" .
+          tar -czvf dist_release/Spoonbill_Studio_v4.0.0_Linux_x64.tar.gz --exclude="dist*" --exclude="__pycache__*" --exclude="runs*" .
           # 2. Universal Portable Package (.zip)
-          zip -r dist_release/Spoonbill_AI_Studio_v4.0.0_Universal_Source.zip . -x "__pycache__/*" "runs/*" "*.tmp" "dist/*" "dist_release/*"
+          zip -r dist_release/Spoonbill_Studio_v4.0.0_Universal_Source.zip . -x "__pycache__/*" "runs/*" "*.tmp" "dist/*" "dist_release/*"
 
       # ── Build Electron Studio Package (Windows) ──────────────────────────────
       - name: Setup Node.js for Electron Studio
@@ -119,12 +119,13 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Build Electron Studio Package (Windows)
+      - name: Build Electron Studio Package & Setup.exe (Windows)
         if: runner.os == 'Windows'
         run: |
           cd Spoonbill_Electron_Studio
           npm install
-          node package_app.js || true
+          node package_app.js
+          powershell -ExecutionPolicy Bypass -File ./build_payload.ps1
 
       # ── Publish Release Artifacts to GitHub ──────────────────────────────────
       - name: Upload Release Artifacts
@@ -136,6 +137,7 @@ jobs:
             App/dist_release/*.dmg
             App/dist_release/*.zip
             App/dist_release/*.tar.gz
+            Spoonbill_Electron_Studio/dist/*.exe
             Spoonbill_Electron_Studio/dist/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

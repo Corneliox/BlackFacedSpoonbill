@@ -103,16 +103,35 @@ async def health_check():
     return {
         "status": "healthy",
         "version": "4.0.0",
-        "torch_device": engine.device.upper(),
+        "active_mode": engine.active_mode,
+        "device": engine.device.upper(),
+        "hw_info": engine.hw_info,
         "onnx_providers": engine.onnx_providers,
         "available_models_count": len(models),
         "export_dir": BATCH_EXPORT_DIR
     }
 
 
+@app.get("/api/hardware/probe")
+async def get_hardware_probe():
+    return {
+        "active_mode": engine.active_mode,
+        "device": engine.device,
+        "hw_info": engine.hw_info
+    }
+
+
+@app.post("/api/hardware/switch_device")
+async def switch_hardware_device(mode: str = Form(...)):
+    res = engine.switch_hardware_mode(mode)
+    return res
+
+
 @app.get("/api/models")
 async def list_models():
     return {
+        "active_mode": engine.active_mode,
+        "device": engine.device.upper(),
         "models": engine.get_available_models()
     }
 

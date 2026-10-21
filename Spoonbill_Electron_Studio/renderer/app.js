@@ -79,14 +79,202 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnExportCsv = document.getElementById('btn-export-csv');
   const btnExportYolo = document.getElementById('btn-export-yolo');
 
+  // --- HARDWARE & ACCELERATION STATE ---
+  let activeHardwareMode = 'cpu';
+  let hardwareInfo = null;
+
+  const btnOpenHwModal = document.getElementById('btn-open-hw-modal');
+  const hwDot = document.getElementById('hw-dot');
+  const hwLabel = document.getElementById('hw-label');
+  const hwTag = document.getElementById('hw-tag');
+  const hwModal = document.getElementById('hw-modal');
+  const btnCloseHwModal = document.getElementById('btn-close-hw-modal');
+  const hwStatusIcon = document.getElementById('hw-status-icon');
+  const hwStatusTitle = document.getElementById('hw-status-title');
+  const hwStatusDesc = document.getElementById('hw-status-desc');
+  const hwValOs = document.getElementById('hw-val-os');
+  const hwValCpu = document.getElementById('hw-val-cpu');
+  const hwValGpus = document.getElementById('hw-val-gpus');
+  const hwValCuda = document.getElementById('hw-val-cuda');
+  const hwValMode = document.getElementById('hw-val-mode');
+  const hwValRec = document.getElementById('hw-val-rec');
+  const btnSetCpuMode = document.getElementById('btn-set-cpu-mode');
+  const btnSetCudaMode = document.getElementById('btn-set-cuda-mode');
+
+  async function fetchHardwareInfo() {
+    try {
+      const res = await fetch('/api/hardware/probe');
+      const data = await res.json();
+      activeHardwareMode = data.active_mode || 'cpu';
+      hardwareInfo = data.hw_info || {};
+      updateHardwarePill();
+      return data;
+    } catch (err) {
+      console.warn('Hardware probe error:', err);
+      return null;
+    }
+  }
+
+  function updateHardwarePill() {
+    if (!hwDot || !hwLabel || !hwTag) return;
+    if (activeHardwareMode === 'cuda') {
+      hwDot.className = 'hw-dot dot-cuda';
+      hwLabel.textContent = 'NVIDIA CUDA Mode';
+      hwTag.textContent = 'Active';
+    } else if (activeHardwareMode === 'mps') {
+      hwDot.className = 'hw-dot dot-cuda';
+      hwLabel.textContent = 'Apple Metal Mode';
+      hwTag.textContent = 'Active';
+    } else {
+      hwDot.className = 'hw-dot dot-cpu';
+      hwLabel.textContent = 'CPU Safe Mode';
+      hwTag.textContent = 'Inspect';
+    }
+  }
+
+  function populateHardwareModal() {
+    if (!hardwareInfo) return;
+    const h = hardwareInfo;
+
+    if (hwValOs) hwValOs.textContent = `${h.system_os || 'OS'} (${h.arch || 'x64'})`;
+    if (hwValCpu) hwValCpu.textContent = `${h.cpu_name || 'Generic CPU'} · ${h.cpu_cores || 4} Cores`;
+
+    if (hwValGpus) {
+      if (h.physical_gpus && h.physical_gpus.length > 0) {
+        hwValGpus.textContent = h.physical_gpus.join(', ');
+      } else {
+        hwValGpus.textContent = 'Integrated Graphics / CPU';
+      }
+    }
+
+    if (hwValCuda) {
+      if (h.cuda_available) {
+        hwValCuda.textContent = `✅ Ready (${h.cuda_device_name || 'NVIDIA GPU'}, ${h.cuda_vram_gb || 0} GB)`;
+        hwValCuda.style.color = '#10B981';
+      } else if (h.has_nvidia_hardware) {
+        hwValCuda.textContent = '⚠️ NVIDIA Detected (PyTorch CUDA Missing)';
+        hwValCuda.style.color = '#F59E0B';
+      } else if (h.mps_available) {
+        hwValCuda.textContent = '✅ Apple Silicon Metal (MPS) Supported';
+        hwValCuda.style.color = '#3B82F6';
+      } else {
+        hwValCuda.textContent = '❌ No Discrete NVIDIA GPU / CUDA';
+        hwValCuda.style.color = '#A1A1AA';
+      }
+    }
+
+    if (hwValMode) {
+      hwValMode.textContent = activeHardwareMode === 'cuda' ? 'NVIDIA GPU Acceleration' :
+                              activeHardwareMode === 'mps' ? 'Apple Silicon Metal (MPS)' : 'CPU Safe Mode (ONNX)';
+    }
+    if (hwValRec) {
+      hwValRec.textContent = activeHardwareMode === 'cpu' ? '11N Nano (<60ms CPU Fast)' : '11L Large / BeakAttn';
+    }
+
+    if (hwStatusTitle) hwStatusTitle.textContent = h.status_label || 'Status Akselerasi';
+    if (hwStatusDesc) hwStatusDesc.textContent = h.description || 'Pemeriksaan status perangkat selesai.';
+    if (hwStatusIcon) hwStatusIcon.textContent = h.cuda_available ? '⚡' : h.has_nvidia_hardware ? '⚠️' : '💻';
+
+    // Buttons
+    if (btnSetCudaMode) {
+      if (h.can_enable_gpu) {
+        btnSetCudaMode.disabled = false;
+        if (activeHardwareMode === 'cuda' || activeHardwareMode === 'mps') {
+          btnSetCudaMode.textContent = 'Akselerasi GPU Sedang Aktif';
+          btnSetCudaMode.disabled = true;
+        } else {
+          btnSetCudaMode.textContent = 'Aktifkan NVIDIA CUDA Mode';
+        }
+      } else {
+        btnSetCudaMode.disabled = true;
+        btnSetCudaMode.textContent = 'NVIDIA CUDA Tidak Tersedia (CPU Only)';
+      }
+    }
+  }
+
+  function openHardwareModal() {
+    if (hwModal) hwModal.style.display = 'flex';
+    fetchHardwareInfo().then(() => {
+      populateHardwareModal();
+    });
+  }
+
+  function closeHardwareModal() {
+    if (hwModal) hwModal.style.display = 'none';
+  }
+
+  async function switchHardwareMode(targetMode) {
+    try {
+      if (targetMode === 'cuda' && btnSetCudaMode) {
+        btnSetCudaMode.textContent = 'Memeriksa & Mengalihkan...';
+        btnSetCudaMode.disabled = true;
+      }
+
+      const fd = new FormData();
+      fd.append('mode', targetMode);
+      const res = await fetch('/api/hardware/switch_device', { method: 'POST', body: fd });
+      const data = await res.json();
+
+      if (!data.success) {
+        alert(data.message || 'Gagal mengubah mode akselerasi.');
+        if (targetMode === 'cuda' && btnSetCudaMode) {
+          btnSetCudaMode.textContent = 'Aktifkan NVIDIA CUDA Mode';
+          btnSetCudaMode.disabled = false;
+        }
+        return;
+      }
+
+      activeHardwareMode = data.active_mode;
+      if (data.hw_info) hardwareInfo = data.hw_info;
+      updateHardwarePill();
+      populateHardwareModal();
+
+      // Refresh catalog models
+      const modelsRes = await fetch('/api/models').then(r => r.json());
+      modelsCatalog = modelsRes.models || [];
+      populateModelPicker();
+
+      setTimeout(() => {
+        closeHardwareModal();
+      }, 600);
+    } catch (e) {
+      console.error('Error switching hardware mode:', e);
+      alert('Terjadi kesalahan saat beralih mode akselerasi.');
+    }
+  }
+
+  function initHardwareInspector() {
+    if (btnOpenHwModal) btnOpenHwModal.addEventListener('click', openHardwareModal);
+    if (btnCloseHwModal) btnCloseHwModal.addEventListener('click', closeHardwareModal);
+    if (hwModal) {
+      hwModal.addEventListener('click', (e) => {
+        if (e.target === hwModal) closeHardwareModal();
+      });
+    }
+    if (btnSetCpuMode) {
+      btnSetCpuMode.addEventListener('click', () => switchHardwareMode('cpu'));
+    }
+    if (btnSetCudaMode) {
+      btnSetCudaMode.addEventListener('click', () => switchHardwareMode('cuda'));
+    }
+  }
+
   // --- 1. INITIALIZATION ---
   async function initStudio() {
     try {
+      initHardwareInspector();
+      await fetchHardwareInfo();
+
       const [modelsRes, samplesRes, benchRes] = await Promise.all([
         fetch('/api/models').then(r => r.json()),
         fetch('/api/samples').then(r => r.json()),
         fetch('/api/benchmarks').then(r => r.json())
       ]);
+
+      if (modelsRes.active_mode) {
+        activeHardwareMode = modelsRes.active_mode;
+        updateHardwarePill();
+      }
 
       modelsCatalog = modelsRes.models || [];
       populateModelPicker();
@@ -122,13 +310,30 @@ document.addEventListener('DOMContentLoaded', () => {
       groups[grpName].forEach(m => {
         const opt = document.createElement('option');
         opt.value = m.id;
-        opt.textContent = `${m.short_name} (${m.params})`;
+
+        let label = m.short_name;
+        if (activeHardwareMode === 'cpu') {
+          if (m.scale === 'N' || m.recommended) {
+            label = `⚡ ${m.short_name} [Rekomendasi CPU]`;
+          } else if (m.cpu_warning || m.scale === 'L' || m.scale === 'M') {
+            label = `⚠️ ${m.short_name} [GPU Disarankan]`;
+          }
+        }
+        opt.textContent = `${label} (${m.params})`;
         og.appendChild(opt);
       });
       selectModel.appendChild(og);
     });
 
-    if (modelsCatalog.some(m => m.id === 'v3_11l_onnx')) selectModel.value = 'v3_11l_onnx';
+    // Default selection: If CPU, default to 11N Nano; if GPU, default to 11L
+    if (activeHardwareMode === 'cpu' && modelsCatalog.some(m => m.id === 'v3_11n_onnx')) {
+      selectModel.value = 'v3_11n_onnx';
+    } else if (modelsCatalog.some(m => m.id === 'v3_11l_onnx')) {
+      selectModel.value = 'v3_11l_onnx';
+    } else if (modelsCatalog.length > 0) {
+      selectModel.value = modelsCatalog[0].id;
+    }
+
     updateModelBadges();
   }
 
@@ -137,6 +342,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!m) return;
     badgeTech.textContent = `${m.params} · ${m.backend} FP32`;
     badgeTarget.textContent = m.badge;
+
+    const warnContainer = document.getElementById('model-warning-container');
+    const warnBadge = document.getElementById('model-warning-badge');
+    if (warnContainer && warnBadge) {
+      if (activeHardwareMode === 'cpu' && (m.cpu_warning || m.scale === 'L' || m.scale === 'M')) {
+        warnContainer.style.display = 'block';
+        warnBadge.className = 'model-badge-warn';
+        warnBadge.textContent = m.warning_text || '⚠️ Disarankan NVIDIA GPU (Beban CPU Tinggi)';
+      } else if (activeHardwareMode === 'cpu' && (m.scale === 'N' || m.recommended)) {
+        warnContainer.style.display = 'block';
+        warnBadge.className = 'model-badge-rec';
+        warnBadge.textContent = '⚡ Rekomendasi CPU Aktif: Kecepatan Instan (<60ms)';
+      } else {
+        warnContainer.style.display = 'none';
+      }
+    }
   }
 
   selectModel.addEventListener('change', () => {

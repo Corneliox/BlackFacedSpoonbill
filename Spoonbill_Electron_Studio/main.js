@@ -65,30 +65,71 @@ function waitForBackendReady(port, timeoutMs = 90000) {
   });
 }
 
+let backendStartupError = null;
+
+function findPythonBinary() {
+  const candidates = process.platform === 'win32'
+    ? ['python', 'py', 'python3']
+    : ['python3', 'python'];
+  for (const cmd of candidates) {
+    try {
+      execSync(`${cmd} --version`, { stdio: 'ignore' });
+      return cmd;
+    } catch (e) {}
+  }
+  return null;
+}
+
 function startPythonBackend(port) {
   const scriptPath = path.join(__dirname, 'backend', 'server.py');
+  const pythonCmd = findPythonBinary();
+
+  if (!pythonCmd) {
+    backendStartupError = 'Python 3 executable not found on system PATH. Please install Python 3.10+ with ONNX / PyTorch.';
+    console.error(`[Electron] ${backendStartupError}`);
+    return;
+  }
+
   const env = Object.assign({}, process.env, {
     SPOONBILL_PORT: String(port),
     PYTHONIOENCODING: 'utf-8'
   });
 
-  pythonProcess = spawn('python', [scriptPath], {
-    cwd: __dirname,
-    env: env,
-    stdio: ['ignore', 'pipe', 'pipe'],
-    windowsHide: true
-  });
+  try {
+    pythonProcess = spawn(pythonCmd, [scriptPath], {
+      cwd: __dirname,
+      env: env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true
+    });
+  } catch (err) {
+    backendStartupError = err.message;
+    console.error('[Electron] Failed to spawn Python backend:', err);
+    return;
+  }
 
   pythonProcess.stdout.on('data', (data) => {
     process.stdout.write(`[Python AI] ${data}`);
   });
 
   pythonProcess.stderr.on('data', (data) => {
-    process.stderr.write(`[Python AI] ${data}`);
+    const str = String(data);
+    process.stderr.write(`[Python AI] ${str}`);
+    if (str.includes('Error') || str.includes('Traceback') || str.includes('ModuleNotFoundError')) {
+      backendStartupError = str.slice(0, 250);
+    }
+  });
+
+  pythonProcess.on('error', (err) => {
+    backendStartupError = `Python process error: ${err.message}`;
+    console.error('[Electron]', backendStartupError);
   });
 
   pythonProcess.on('exit', (code) => {
     console.log(`[Electron] Python backend exited with code ${code}`);
+    if (code !== 0 && code !== null) {
+      backendStartupError = `Python backend exited with code ${code}. Check dependencies (onnxruntime, fastapi, uvicorn, opencv-python).`;
+    }
     pythonProcess = null;
   });
 }
@@ -137,6 +178,8 @@ function getSplashHtml(port) {
           flex-direction: column;
           align-items: center;
           box-shadow: 0 20px 48px rgba(0,0,0,0.6);
+          max-width: 480px;
+          text-align: center;
         }
         .mark {
           width: 44px; height: 44px;
@@ -166,7 +209,20 @@ function getSplashHtml(port) {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(290%); }
         }
-        .status { font-size: 11px; color: #A1A1AA; }
+        .status { font-size: 11px; color: #A1A1AA; line-height: 1.5; }
+        .error-box {
+          margin-top: 14px;
+          padding: 10px 14px;
+          background: rgba(239, 68, 68, 0.1);
+          border: 1px solid rgba(239, 68, 68, 0.25);
+          border-radius: 8px;
+          font-size: 11px;
+          color: #FCA5A5;
+          text-align: left;
+          max-height: 100px;
+          overflow-y: auto;
+          display: none;
+        }
       </style>
     </head>
     <body>
@@ -181,7 +237,8 @@ function getSplashHtml(port) {
         <h1>Spoonbill Studio</h1>
         <span class="sub">Platalea minor AI Census &amp; Research</span>
         <div class="track"><div class="bar"></div></div>
-        <p class="status" id="status-text">Warming PyTorch CUDA &amp; ONNX Engines...</p>
+        <p class="status" id="status-text">Starting AI Engine (CPU Safe Mode)...</p>
+        <div class="error-box" id="error-box"></div>
       </div>
 
       <script>
@@ -195,23 +252,26 @@ function getSplashHtml(port) {
               .then(res => {
                 if (res.ok) {
                   const statusEl = document.getElementById('status-text');
-                  if (statusEl) statusEl.textContent = 'Engines online. Launching studio...';
+                  if (statusEl) statusEl.textContent = 'Engine online. Opening studio...';
                   setTimeout(() => {
                     window.location.href = targetUrl;
-                  }, 300);
+                  }, 250);
                 } else {
                   setTimeout(check, 600);
                 }
               })
               .catch(() => {
                 const statusEl = document.getElementById('status-text');
-                if (statusEl && tries > 20) {
-                  statusEl.textContent = 'Loading models into VRAM (' + tries + 's)...';
+                if (statusEl && tries > 12) {
+                  statusEl.textContent = 'Connecting to backend engine (' + tries + 's)...';
+                }
+                if (statusEl && tries > 30) {
+                  statusEl.innerHTML = 'Still initializing backend...<br><span style="font-size:10px;color:#71717A">Verifying Python &amp; model dependencies</span>';
                 }
                 setTimeout(check, 600);
               });
           }
-          setTimeout(check, 800);
+          setTimeout(check, 600);
         })();
       </script>
     </body>
