@@ -28,8 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
     position: 'top-left',   // 'top-left', 'top-right', 'bottom-left', 'bottom-right', 'custom'
     customX: null,
     customY: null,
-    theme: 'light',         // 'light', 'dark', 'minimal'
-    opacity: 0.90,
+    theme: 'dark',          // 'dark' (sleek studio glass default), 'light', 'minimal'
+    opacity: 0.92,
     scale: 1.00,
     customNote: '',
     bakeOnExport: false,
@@ -336,12 +336,25 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // --- INSPECTOR TAB SWITCHING (MODEL & SAHI vs INFO LABEL) ---
+  function triggerHudPulse() {
+    if (!floatingInfoHud) return;
+    floatingInfoHud.classList.remove('pulse-highlight');
+    void floatingInfoHud.offsetWidth;
+    floatingInfoHud.classList.add('pulse-highlight');
+    setTimeout(() => {
+      if (floatingInfoHud) floatingInfoHud.classList.remove('pulse-highlight');
+    }, 1000);
+  }
+
   function switchInspectorTab(tabName) {
     const isDetect = (tabName === 'detect');
     tabBtnDetect.classList.toggle('active', isDetect);
     tabBtnHud.classList.toggle('active', !isDetect);
     itabDetect.classList.toggle('hidden', !isDetect);
     itabHud.classList.toggle('hidden', isDetect);
+    if (!isDetect && hudConfig.visible) {
+      triggerHudPulse();
+    }
   }
 
   tabBtnDetect.addEventListener('click', () => switchInspectorTab('detect'));
@@ -605,11 +618,13 @@ document.addEventListener('DOMContentLoaded', () => {
     chkHudVisible.addEventListener('change', () => {
       hudConfig.visible = chkHudVisible.checked;
       syncInfoHudUI();
+      if (hudConfig.visible) triggerHudPulse();
     });
 
     toolHud.addEventListener('click', () => {
       hudConfig.visible = !hudConfig.visible;
       syncInfoHudUI();
+      if (hudConfig.visible) triggerHudPulse();
     });
 
     btnHudHide.addEventListener('click', (e) => {
@@ -621,12 +636,20 @@ document.addEventListener('DOMContentLoaded', () => {
     btnHudRestore.addEventListener('click', () => {
       hudConfig.visible = true;
       syncInfoHudUI();
+      triggerHudPulse();
     });
 
     btnHudCustomize.addEventListener('click', (e) => {
       e.stopPropagation();
       switchInspectorTab('hud');
     });
+
+    const topExpBadge = document.getElementById('top-exp-badge');
+    if (topExpBadge) {
+      topExpBadge.addEventListener('click', () => {
+        switchInspectorTab('hud');
+      });
+    }
 
     // Per-Bird Confidence Tags Toggle
     chkBirdTags.addEventListener('change', () => {
@@ -655,6 +678,7 @@ document.addEventListener('DOMContentLoaded', () => {
         hudConfig.customX = null;
         hudConfig.customY = null;
         syncInfoHudUI();
+        triggerHudPulse();
       });
     });
 
@@ -663,6 +687,7 @@ document.addEventListener('DOMContentLoaded', () => {
       hudConfig.customX = null;
       hudConfig.customY = null;
       syncInfoHudUI();
+      triggerHudPulse();
     });
 
     // Field Checkboxes

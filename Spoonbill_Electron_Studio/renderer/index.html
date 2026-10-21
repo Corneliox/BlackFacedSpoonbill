@@ -23,7 +23,7 @@
           </svg>
         </div>
         <span class="ps-app-name">Spoonbill Studio</span>
-        <span class="ps-exp-badge" title="Version 4.1.0 Experimental Build — Non-Destructive Customizable Info HUD">v4.1 EXP</span>
+        <span class="ps-exp-badge" id="top-exp-badge" title="Klik untuk membuka Pengaturan Info Label (v4.1 EXP)" style="cursor: pointer;">v4.1 EXP</span>
         <span class="ps-divider">/</span>
         <span class="ps-file-tag" id="top-filename">101.jpg</span>
       </div>
@@ -101,7 +101,7 @@
         <canvas id="studio-canvas"></canvas>
 
         <!-- NON-DESTRUCTIVE FLOATING SPOONBILL INFO BOX (V4.1 EXPERIMENTAL) -->
-        <div class="spoonbill-info-hud theme-light pos-top-left" id="floating-info-hud" title="Drag to reposition anywhere on canvas">
+        <div class="spoonbill-info-hud theme-dark pos-top-left" id="floating-info-hud" title="Drag to reposition anywhere on canvas">
           <div class="info-hud-accent"></div>
           <div class="info-hud-content">
             <div class="info-hud-top-row" id="hud-row-top">
@@ -404,8 +404,8 @@
           <div class="ps-section">
             <label class="section-label">Theme &amp; Appearance</label>
             <select id="select-hud-theme" class="ps-select">
-              <option value="light" selected>Classic Light Card (Terracotta Bar)</option>
-              <option value="dark">Dark Studio Glass (Sleek Dark)</option>
+              <option value="dark" selected>Dark Studio Glass (Sleek Dark)</option>
+              <option value="light">Classic Light Card (Terracotta Bar)</option>
               <option value="minimal">Minimal Compact Pill</option>
             </select>
 

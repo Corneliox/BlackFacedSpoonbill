@@ -130,42 +130,156 @@ public class ModernButton : BufferedPanel
 
 public class ScrollTextPanel : BufferedPanel
 {
-    private Panel innerScroll;
+    private Panel clipPanel;
     private Label lblContent;
-    private Label bottomAnchor;
+    private BufferedPanel scrollTrack;
+    private BufferedPanel scrollThumb;
+    private int scrollOffset = 0;
+    private int maxScroll = 0;
+    private bool isDraggingThumb = false;
+    private int dragStartY = 0;
+    private int dragStartOffset = 0;
 
     public ScrollTextPanel(int width, int height)
     {
         this.Size = new Size(width, height);
         this.BackColor = Color.FromArgb(14, 14, 18);
 
-        innerScroll = new Panel();
-        innerScroll.Location = new Point(2, 2);
-        innerScroll.Size = new Size(width - 4, height - 4);
-        innerScroll.BackColor = Color.FromArgb(14, 14, 18);
-        innerScroll.AutoScroll = true;
-        this.Controls.Add(innerScroll);
+        clipPanel = new Panel();
+        clipPanel.Location = new Point(2, 2);
+        clipPanel.Size = new Size(width - 16, height - 4);
+        clipPanel.BackColor = Color.FromArgb(14, 14, 18);
+        clipPanel.AutoScroll = false;
+        this.Controls.Add(clipPanel);
 
         lblContent = new Label();
         lblContent.Location = new Point(10, 8);
         lblContent.AutoSize = true;
-        lblContent.MaximumSize = new Size(width - 36, 0);
+        lblContent.MaximumSize = new Size(width - 32, 0);
         lblContent.BackColor = Color.FromArgb(14, 14, 18);
         lblContent.ForeColor = Color.FromArgb(236, 236, 244);
         lblContent.Font = new Font("Consolas", 8.5F, FontStyle.Regular);
         lblContent.UseMnemonic = false;
-        innerScroll.Controls.Add(lblContent);
+        clipPanel.Controls.Add(lblContent);
 
-        bottomAnchor = new Label();
-        bottomAnchor.Size = new Size(1, 4);
-        bottomAnchor.Location = new Point(10, 20);
-        innerScroll.Controls.Add(bottomAnchor);
+        scrollTrack = new BufferedPanel();
+        scrollTrack.Location = new Point(width - 10, 4);
+        scrollTrack.Size = new Size(6, height - 8);
+        scrollTrack.BackColor = Color.FromArgb(22, 22, 28);
+        this.Controls.Add(scrollTrack);
+
+        scrollThumb = new BufferedPanel();
+        scrollThumb.Size = new Size(6, 30);
+        scrollThumb.Location = new Point(0, 0);
+        scrollThumb.BackColor = Color.FromArgb(75, 75, 88);
+        scrollTrack.Controls.Add(scrollThumb);
+
+        // Wheel events
+        this.MouseWheel += HandleWheel;
+        clipPanel.MouseWheel += HandleWheel;
+        lblContent.MouseWheel += HandleWheel;
+        scrollTrack.MouseWheel += HandleWheel;
+        scrollThumb.MouseWheel += HandleWheel;
+
+        scrollThumb.MouseEnter += (s, e) => {
+            scrollThumb.BackColor = Color.FromArgb(246, 130, 31);
+        };
+        scrollThumb.MouseLeave += (s, e) => {
+            if (!isDraggingThumb) scrollThumb.BackColor = Color.FromArgb(75, 75, 88);
+        };
+
+        scrollThumb.MouseDown += (s, e) => {
+            if (e.Button == MouseButtons.Left)
+            {
+                isDraggingThumb = true;
+                dragStartY = Cursor.Position.Y;
+                dragStartOffset = scrollOffset;
+                scrollThumb.BackColor = Color.FromArgb(246, 130, 31);
+            }
+        };
+
+        scrollThumb.MouseMove += (s, e) => {
+            if (isDraggingThumb && maxScroll > 0)
+            {
+                int deltaY = Cursor.Position.Y - dragStartY;
+                int trackScrollable = scrollTrack.Height - scrollThumb.Height;
+                if (trackScrollable > 0)
+                {
+                    float ratio = (float)maxScroll / trackScrollable;
+                    SetScrollOffset(dragStartOffset + (int)(deltaY * ratio));
+                }
+            }
+        };
+
+        scrollThumb.MouseUp += (s, e) => {
+            isDraggingThumb = false;
+            scrollThumb.BackColor = Color.FromArgb(75, 75, 88);
+        };
+
+        scrollTrack.MouseDown += (s, e) => {
+            if (e.Button == MouseButtons.Left && maxScroll > 0)
+            {
+                int targetThumbTop = e.Y - scrollThumb.Height / 2;
+                int trackScrollable = scrollTrack.Height - scrollThumb.Height;
+                if (trackScrollable > 0)
+                {
+                    float ratio = (float)targetThumbTop / trackScrollable;
+                    SetScrollOffset((int)(ratio * maxScroll));
+                }
+            }
+        };
+    }
+
+    private void HandleWheel(object sender, MouseEventArgs e)
+    {
+        if (maxScroll <= 0) return;
+        int delta = -e.Delta / 2;
+        SetScrollOffset(scrollOffset + delta);
+    }
+
+    public void SetScrollOffset(int offset)
+    {
+        scrollOffset = Math.Max(0, Math.Min(maxScroll, offset));
+        lblContent.Top = 8 - scrollOffset;
+
+        int trackScrollable = scrollTrack.Height - scrollThumb.Height;
+        if (maxScroll > 0 && trackScrollable > 0)
+        {
+            float ratio = (float)scrollOffset / maxScroll;
+            scrollThumb.Top = (int)(ratio * trackScrollable);
+        }
+        else
+        {
+            scrollThumb.Top = 0;
+        }
+    }
+
+    private void UpdateScrollLayout()
+    {
+        int contentH = lblContent.Height + 16;
+        int viewH = clipPanel.Height;
+        if (contentH > viewH)
+        {
+            maxScroll = contentH - viewH;
+            scrollTrack.Visible = true;
+            float viewRatio = (float)viewH / contentH;
+            int thumbH = Math.Max(24, (int)(scrollTrack.Height * viewRatio));
+            scrollThumb.Height = thumbH;
+            SetScrollOffset(scrollOffset);
+        }
+        else
+        {
+            maxScroll = 0;
+            scrollTrack.Visible = false;
+            SetScrollOffset(0);
+        }
     }
 
     public void SetText(string text)
     {
         lblContent.Text = text;
-        bottomAnchor.Location = new Point(10, lblContent.Bottom + 4);
+        scrollOffset = 0;
+        UpdateScrollLayout();
     }
 
     public void AppendLine(string line)
@@ -178,12 +292,8 @@ public class ScrollTextPanel : BufferedPanel
         {
             lblContent.Text = lblContent.Text + Environment.NewLine + line;
         }
-        bottomAnchor.Location = new Point(10, lblContent.Bottom + 4);
-        try
-        {
-            innerScroll.ScrollControlIntoView(bottomAnchor);
-        }
-        catch {}
+        UpdateScrollLayout();
+        SetScrollOffset(maxScroll);
     }
 
     protected override void OnPaint(PaintEventArgs e)
