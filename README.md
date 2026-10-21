@@ -172,19 +172,32 @@ For full institutional affiliations and contributor profiles, refer to [AUTHORS.
 
 ## 8. Citation
 
-If you utilize this codebase, trained model checkpoints, or findings in academic or conservation publications, please cite using [CITATION.cff](CITATION.cff) or the following format:
+If you utilize this codebase, trained model checkpoints, desktop application, or findings in academic or ecological conservation publications, please cite using [CITATION.cff](CITATION.cff) or the following reference formats:
 
+### BibTeX
 ```bibtex
 @software{ramadhan2026spoonbill,
   author       = {Gilang Ramadhan},
-  title        = {{Black-Faced Spoonbill AI Detection & Instance Segmentation Project}},
+  title        = {{Black-Faced Spoonbill AI Detection \& Instance Segmentation Project: Automated Census and Attention-Guided Instance Segmentation for Platalea minor}},
   year         = {2026},
-  version      = {4.0.0},
+  version      = {4.1.0},
   publisher    = {GitHub},
-  institution  = {Asia University, Taiwan},
+  institution  = {Department of Computer Science and Information Engineering, Asia University, Taiwan},
   url          = {https://github.com/Corneliox/BlackFacedSpoonbill}
 }
 ```
+
+### APA (7th Edition)
+> Ramadhan, G. (2026). *Black-Faced Spoonbill AI Detection & Instance Segmentation Project: Automated Census and Attention-Guided Instance Segmentation for Platalea minor* (Version 4.1.0) [Computer software]. GitHub. https://github.com/Corneliox/BlackFacedSpoonbill
+
+### IEEE Style
+> G. Ramadhan, "Black-Faced Spoonbill AI Detection & Instance Segmentation Project: Automated Census and Attention-Guided Instance Segmentation for Platalea minor," version 4.1.0, Department of Computer Science and Information Engineering, Asia University, Taiwan, 2026. [Online]. Available: https://github.com/Corneliox/BlackFacedSpoonbill
+
+### Harvard Style
+> Ramadhan, G., 2026. *Black-Faced Spoonbill AI Detection & Instance Segmentation Project* (Version 4.1.0). [software] Asia University, Taiwan. Available at: <https://github.com/Corneliox/BlackFacedSpoonbill> [Accessed 22 October 2026].
+
+### Chicago Manual of Style
+> Ramadhan, Gilang. 2026. "Black-Faced Spoonbill AI Detection & Instance Segmentation Project." Version 4.1.0. GitHub. https://github.com/Corneliox/BlackFacedSpoonbill.
 
 ---
 

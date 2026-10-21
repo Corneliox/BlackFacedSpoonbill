@@ -1,8 +1,8 @@
 cff-version: 1.2.0
 message: "If you use this software, models, or research findings in your work, please cite it as below."
 title: "Black-Faced Spoonbill AI Detection & Instance Segmentation Project"
-version: 4.0.0
-date-released: 2026-10-21
+version: 4.1.0
+date-released: 2026-10-22
 license: "CC-BY-NC-SA-4.0"
 repository-code: "https://github.com/Corneliox/BlackFacedSpoonbill"
 url: "https://corneliox.github.io/BlackFacedSpoonbill/"
@@ -15,14 +15,30 @@ keywords:
   - "platalea minor"
   - "instance segmentation"
   - "yolo11"
-  - "sahi"
+  - "yolov12"
   - "coordinate attention"
+  - "beak attention"
+  - "sahi"
   - "computer vision"
   - "wildlife conservation"
+  - "wetland census"
   - "taiwan"
 abstract: >
-  An automated high-precision instance segmentation and demographic census system
-  developed for the endangered Black-faced Spoonbill (Platalea minor). The platform
-  integrates YOLO11 deep neural architectures with Sliced Aided Hyper Inference (SAHI),
-  Coordinate Attention (CoordAtt @ P3), and a deterministic cross-platform desktop studio
-  supporting Windows, macOS, and Linux.
+  An automated high-precision instance segmentation, fine-grained morphology classification,
+  and demographic census system developed for the endangered Black-faced Spoonbill (Platalea minor).
+  The platform integrates YOLO11/YOLOv12 deep neural architectures with Sliced Aided Hyper Inference (SAHI),
+  P3-stage Coordinate Attention (BeakAttention @ P3), and a deterministic cross-platform desktop studio
+  with non-destructive floating HUD telemetry supporting Windows 10/11, macOS (Apple Silicon & Intel), and Linux.
+preferred-citation:
+  type: software
+  authors:
+    - family-names: "Ramadhan"
+      given-names: "Gilang"
+      affiliation: "Department of Computer Science and Information Engineering, Asia University, Taiwan"
+  title: "Black-Faced Spoonbill AI Detection & Instance Segmentation Project: Automated Census and Attention-Guided Instance Segmentation for Platalea minor"
+  version: "4.1.0"
+  year: 2026
+  date-released: "2026-10-22"
+  url: "https://github.com/Corneliox/BlackFacedSpoonbill"
+  institution:
+    name: "Asia University, Taiwan"
