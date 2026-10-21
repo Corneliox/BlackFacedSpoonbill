@@ -44,5 +44,6 @@ echo "[3/3] Launching Spoonbill AI Studio..."
 open "$TARGET_APP"
 echo ""
 echo "Done! Spoonbill AI Studio is now unlocked and trusted on this Mac."
+echo "You can now launch 'Spoonbill_AI_Studio' directly from Finder > Applications."
 sleep 2
 exit 0

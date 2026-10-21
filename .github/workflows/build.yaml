@@ -145,6 +145,8 @@ jobs:
           cp icon.icns dmg_tmp/.VolumeIcon.icns
           cp Unlock_and_Open_Mac.command dmg_tmp/Unlock_and_Open_Mac.command
           chmod +x dmg_tmp/Unlock_and_Open_Mac.command
+          cp PETUNJUK_CARA_BUKA_MAC.txt dmg_tmp/PETUNJUK_CARA_BUKA_MAC.txt
+          cp README_MAC_USERS.txt dmg_tmp/README_MAC_USERS.txt
           ln -s /Applications dmg_tmp/Applications
           hdiutil create -volname "Spoonbill AI Studio" -srcfolder dmg_tmp -ov -format UDZO -imagekey zlib-level=9 "dist_release/Spoonbill_Studio_v4.0.0_macOS_Intel_x64.dmg"
           cp "dist_release/Spoonbill_Studio_v4.0.0_macOS_Intel_x64.dmg" "dist_release/Spoonbill_Studio_v4.1.0_Experimental_macOS_Intel_x64.dmg"
@@ -218,6 +220,8 @@ jobs:
           cp icon.icns dmg_tmp/.VolumeIcon.icns
           cp Unlock_and_Open_Mac.command dmg_tmp/Unlock_and_Open_Mac.command
           chmod +x dmg_tmp/Unlock_and_Open_Mac.command
+          cp PETUNJUK_CARA_BUKA_MAC.txt dmg_tmp/PETUNJUK_CARA_BUKA_MAC.txt
+          cp README_MAC_USERS.txt dmg_tmp/README_MAC_USERS.txt
           ln -s /Applications dmg_tmp/Applications
           hdiutil create -volname "Spoonbill AI Studio" -srcfolder dmg_tmp -ov -format UDZO -imagekey zlib-level=9 "dist_release/Spoonbill_Studio_v4.0.0_macOS_AppleSilicon_ARM64.dmg"
           cp "dist_release/Spoonbill_Studio_v4.0.0_macOS_AppleSilicon_ARM64.dmg" "dist_release/Spoonbill_Studio_v4.1.0_Experimental_macOS_AppleSilicon_ARM64.dmg"

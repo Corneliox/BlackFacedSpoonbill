@@ -1,0 +1,74 @@
+================================================================================
+  PETUNJUK CARA MEMBUKA SPOONBILL AI STUDIO DI MACOS (APPLE SILICON & INTEL)
+  Mengatasi Peringatan Keamanan Gatekeeper (Apple Developer Unidentified)
+================================================================================
+
+Terima kasih telah menggunakan Spoonbill AI Studio v4.1!
+Aplikasi ini dikembangkan dan didistribusikan secara independen (open source)
+untuk penelitian konservasi burung Black-faced Spoonbill.
+
+Karena aplikasi tidak didistribusikan melalui Apple App Store resmi, fitur
+keamanan macOS Gatekeeper akan memunculkan dialog peringatan:
+"Spoonbill_AI_Studio tidak dapat dibuka karena Apple tidak dapat memeriksanya"
+atau "Unidentified Developer".
+
+Ikuti 4 langkah cepat dan aman berikut untuk menjalankannya:
+
+--------------------------------------------------------------------------------
+LANGKAH 1: SALIN APLIKASI KE FOLDER APPLICATIONS
+--------------------------------------------------------------------------------
+1. Tarik (drag & drop) ikon "Spoonbill_AI_Studio.app" ke folder "Applications"
+   yang ada di dalam jendela DMG ini.
+2. Tunggu proses penyalinan selesai (sekitar 3-5 detik).
+
+--------------------------------------------------------------------------------
+LANGKAH 2: JALANKAN SKRIP PEMBUKA KEAMANAN (UNLOCK SCRIPT)
+--------------------------------------------------------------------------------
+Di dalam jendela DMG ini terdapat berkas skrip bernama:
+   "Unlock_and_Open_Mac.command"
+
+PERHATIAN: JANGAN klik ganda langsung jika muncul peringatan keamanan.
+
+Cara menjalankan yang benar:
+1. KLIK KANAN (atau tahan tombol CONTROL di keyboard lalu KLIK) pada berkas:
+   "Unlock_and_Open_Mac.command"
+2. Pilih menu "Open" (Buka).
+3. macOS akan menampilkan jendela konfirmasi:
+   "Unlock_and_Open_Mac.command is from an unidentified developer. Are you sure you want to open it?"
+4. Klik tombol "Open" (Buka) untuk mengonfirmasi bahwa skrip aman.
+
+--------------------------------------------------------------------------------
+LANGKAH 3: BIARKAN SKRIP MEMBERSIHKAN KARANTINA
+--------------------------------------------------------------------------------
+Jendela Terminal akan terbuka otomatis dan menjalankan 3 tahapan:
+   [1/3] Memeriksa / menyalin Spoonbill_AI_Studio.app ke /Applications
+   [2/3] Menghapus atribut karantina Gatekeeper (com.apple.quarantine)
+   [3/3] Menjalankan Spoonbill AI Studio
+
+Tunggu 2-3 detik hingga muncul tulisan:
+"Done! Spoonbill AI Studio is now unlocked and trusted on this Mac."
+Jendela Terminal dapat ditutup setelah proses ini selesai.
+
+--------------------------------------------------------------------------------
+LANGKAH 4: BUKA DAN GUNAKAN SPOONBILL STUDIO
+--------------------------------------------------------------------------------
+Aplikasi Spoonbill AI Studio akan otomatis terbuka di layar Anda!
+
+Untuk penggunaan berikutnya:
+Anda cukup membuka "Spoonbill_AI_Studio" langsung dari Finder > Applications
+atau dari Launchpad/Spotlight seperti aplikasi Mac pada umumnya, tanpa perlu
+menjalankan skrip ini lagi.
+
+================================================================================
+METODE ALTERNATIF (JIKA TIDAK INGIN MENGGUNAKAN SKRIP):
+================================================================================
+1. Buka Finder > Masuk ke folder "Applications".
+2. Cari "Spoonbill_AI_Studio.app".
+3. KLIK KANAN (atau Control + Klik) pada "Spoonbill_AI_Studio.app" > Pilih "Open".
+4. Pada kotak dialog peringatan Apple, klik tombol "Open" (Buka).
+5. Atau masuk ke menu Apple (kiri atas) > System Settings > Privacy & Security >
+   Gulir ke bawah ke bagian "Security" > Klik tombol "Open Anyway" (Tetap Buka).
+
+================================================================================
+Selesai! Selamat menggunakan Spoonbill AI Studio v4.1.
+================================================================================
