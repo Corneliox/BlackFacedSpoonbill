@@ -1,8 +1,8 @@
-# Release Notes: Spoonbill AI Studio v4.1.0-experimental (Non-Destructive HUD & Unified Studio)
+# Release Notes: Spoonbill AI Studio v4.1.0 Stable (Non-Destructive HUD & Unified Studio)
 
 ## 1. Executive Summary
 
-Spoonbill AI Studio version 4.1.0-experimental represents a major UX and architectural enhancement following the stabilized v4.0.0 multi-platform release. This update decouples ecological census telemetry from underlying image pixels, introducing a **Non-Destructive Floating Info Label (HUD)**, a dedicated **Info Label Customization Tab**, custom sleek dark scrollbars and range sliders across the entire workstation and Windows installer, an 85% reduced macOS Apple Silicon distribution package (99.59 MB), and automated Gatekeeper bypass tooling for macOS Sequoia/Sonoma on Apple Silicon M-series laptops.
+Spoonbill AI Studio version 4.1.0 represents a major UX and architectural enhancement following the stabilized v4.0.0 multi-platform release. This update decouples ecological census telemetry from underlying image pixels, introducing a **Non-Destructive Floating Info Label (HUD)**, a dedicated **Info Label Customization Tab**, custom sleek dark scrollbars and range sliders across the entire workstation and Windows installer, an 85% reduced macOS Apple Silicon distribution package (99.59 MB), and automated Gatekeeper bypass tooling for macOS Sequoia/Sonoma on Apple Silicon M-series laptops.
 
 ---
 
@@ -32,10 +32,12 @@ Spoonbill AI Studio version 4.1.0-experimental represents a major UX and archite
 
 | Platform / Architecture | Artifact Name | Description |
 | :--- | :--- | :--- |
-| **Windows 10 / 11 (Installer)** | `Spoonbill_Studio_v4.1.0_Experimental_Setup.exe` | Native C# NVIDIA-style wizard with dark custom scrollbars, system readiness checks, and uninstaller. |
-| **Windows 10 / 11 (Portable)** | `Spoonbill_Studio_v4.1.0_Experimental_Windows_x64.zip` | Standalone portable archive for USB or lab environments. |
-| **macOS Apple Silicon (ARM64)** | `Spoonbill_Studio_v4.1.0_Experimental_macOS_AppleSilicon_ARM64.dmg` | Slim signed disk image (99.59 MB) optimized for M1, M2, M3, and M4 Apple Silicon Macs. |
-| **macOS Intel (x64)** | `Spoonbill_Studio_v4.1.0_Experimental_macOS_Intel_x64.dmg` | Native signed disk image for legacy Intel Macs. |
+| **Windows 10 / 11 (Installer)** | `Spoonbill_Studio_v4.1.0_Setup.exe` | Native C# NVIDIA-style wizard with dark custom scrollbars, system readiness checks, and uninstaller. |
+| **Windows 10 / 11 (Portable)** | `Spoonbill_Studio_v4.1.0_Windows_x64.zip` | Standalone portable archive for USB or lab environments. |
+| **Windows 10 / 11 (Direct Run)** | `Spoonbill_Studio_v4.1.0_DirectRun_Windows_x64.exe` | Single-file portable direct runner executable. |
+| **macOS Apple Silicon (ARM64)** | `Spoonbill_Studio_v4.1.0_macOS_AppleSilicon_ARM64.dmg` | Slim signed disk image (99.59 MB) optimized for M1, M2, M3, and M4 Apple Silicon Macs. |
+| **macOS Intel (x64)** | `Spoonbill_Studio_v4.1.0_macOS_Intel_x64.dmg` | Native signed disk image for legacy Intel Macs. |
+| **Linux (Universal)** | `Spoonbill_Studio_v4.1.0_Linux_x64.tar.gz` | Compressed tarball for Ubuntu/Debian/Arch Linux workstations. |
 
 ---
 
