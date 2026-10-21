@@ -1,0 +1,71 @@
+Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0)
+with Author Contribution & Non-Commercial Enforcement Addendum
+
+Copyright (c) 2024-2026 Black-Faced Spoonbill AI Research Project Contributors
+Lead Researcher & Developer: Gilang Ramadhan
+Institution: Department of Computer Science and Information Engineering, Asia University, Taiwan
+
+================================================================================
+TERMS AND CONDITIONS FOR ACCESS, USE, REPRODUCTION, AND DISTRIBUTION
+================================================================================
+
+This software, its source code, machine learning model weights, architectures,
+evaluation datasets, documentation, and graphical desktop applications (collectively,
+the "Work") are provided under the terms of the Creative Commons Attribution-
+NonCommercial-ShareAlike 4.0 International Public License (CC BY-NC-SA 4.0).
+
+By exercising any rights granted herein, you accept and agree to be bound by the
+terms and conditions of this license.
+
+--------------------------------------------------------------------------------
+1. PERMITTED USES (FREE & OPEN SOURCE FOR NON-COMMERCIAL USE)
+--------------------------------------------------------------------------------
+You are free to:
+- Share: Copy, redistribute, and transmit the material in any medium or format.
+- Adapt: Remix, transform, and build upon the material for non-commercial research,
+  ecological monitoring, conservation studies, academic research, and education.
+
+Under the following terms:
+- Attribution: You must give appropriate credit, provide a link to the license,
+  cite the official authors and research paper / repository, and indicate if changes
+  were made. You may do so in any reasonable manner, but not in any way that suggests
+  the licensor endorses you or your use.
+- ShareAlike: If you remix, transform, or build upon the material, you must distribute
+  your contributions under the same license as the original.
+
+--------------------------------------------------------------------------------
+2. STRICT NON-COMMERCIAL RESTRICTION (NO PAID/COMMERCIAL USE WITHOUT PERMISSION)
+--------------------------------------------------------------------------------
+- NonCommercial: You may NOT use this material for commercial purposes.
+  Commercial purposes include, but are not limited to:
+  * Selling, sublicensing, leasing, or charging access fees for the software,
+    source code, desktop applications, or pre-trained model weights.
+  * Integrating the models or software into paid enterprise software, proprietary
+    cloud APIs, commercial software-as-a-service (SaaS) platforms, or for-profit
+    surveillance or monitoring products.
+  * Using the software to perform paid commercial consulting, commercial environmental
+    impact assessments, or contracted surveillance operations without explicit written
+    authorization from the project authors.
+
+--------------------------------------------------------------------------------
+3. COMMERCIAL LICENSING & AUTHOR CONTRIBUTION AGREEMENT
+--------------------------------------------------------------------------------
+Any commercial usage, proprietary integration, or commercial derivative of this Work
+is strictly prohibited unless:
+(a) You have obtained explicit prior written authorization from the primary authors;
+    and
+(b) You have established a formal contribution and attribution agreement acknowledging
+    the authors' research and software rights.
+
+For commercial licensing inquiries, institutional partnerships, or authorization requests,
+contact the project maintainers directly via the repository channels.
+
+--------------------------------------------------------------------------------
+4. DISCLAIMER OF WARRANTIES
+--------------------------------------------------------------------------------
+THE WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION WITH THE WORK
+OR THE USE OR OTHER DEALINGS IN THE WORK.

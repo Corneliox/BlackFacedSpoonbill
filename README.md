@@ -1,143 +1,182 @@
 # Black-Faced Spoonbill AI Detection & Instance Segmentation Project
-### Sistem Pendeteksi, Segmentasi Instans & Penghitung Populasi Burung Sendok Muka Hitam (*Platalea minor*)
+### Automated Instance Segmentation, Attention-Guided Feature Extraction, and Demographic Census Platform for *Platalea minor*
 
-Repositori ini berisi seluruh alur riset, kode sumber, dataset, model bobot *deep learning*, dan aplikasi grafis desktop mandiri yang dikembangkan untuk mendeteksi dan mensegmentasi burung langka **Black-faced Spoonbill** (Burung Sendok Muka Hitam) di habitat perairan/pesisir Taiwan.
-
----
-
-## 📑 Daftar Isi
-1. [Latar Belakang & Arsitektur Sistem](#-latar-belakang--arsitektur-sistem)
-2. [Struktur Direktori Repositori](#-struktur-direktori-repositori)
-3. [Rangkuman Model & Bobot (.pt)](#-rangkuman-model--bobot-pt)
-4. [Evolusi Modul & Pipeline](#-evolusi-modul--pipeline)
-   * [1. Modul YOLOv11 Baseline (Yolov11_InsSeg)](#1-modul-yolov11-baseline-yolov11_insseg)
-   * [2. Modul Segment Anything Model (SAM)](#2-modul-segment-anything-model-sam)
-   * [3. Modul SAHI V1 & V2 (Tiled Instance Segmentation)](#3-modul-sahi-v1--v2-tiled-instance-segmentation)
-5. [Panduan Penggunaan & Eksekusi](#-panduan-penggunaan--eksekusi)
-6. [Metrik Performa & Hasil Evaluasi](#-metrik-performa--hasil-evaluasi)
+[![Release v4.0.0](https://img.shields.io/badge/Release-v4.0.0-blue.svg)](https://github.com/Corneliox/BlackFacedSpoonbill/releases/tag/v4.0.0)
+[![Live Web Demo](https://img.shields.io/badge/Web_Demo-GitHub_Pages_(Nano_Tier)-green.svg)](https://corneliox.github.io/BlackFacedSpoonbill/)
+[![License](https://img.shields.io/badge/License-CC_BY--NC--SA_4.0-orange.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Windows_%7C_macOS_%7C_Linux-lightgrey.svg)](https://github.com/Corneliox/BlackFacedSpoonbill/releases)
 
 ---
 
-## 🔬 Latar Belakang & Arsitektur Sistem
+## 1. Overview and Ecological Context
 
-Burung Sendok Muka Hitam (*Platalea minor*) merupakan spesies burung air langka yang memiliki ciri khas berupa paruh berbentuk spatula berwarna hitam pekat. Tantangan utama dalam visi komputer untuk spesies ini meliputi:
-* **Gerombolan Burung yang Berhimpitan**: Burung sering berdiri rapat di atas air sehingga kotak pembatas (*bounding box*) standar saling menumpuk.
-* **Resolusi Citra Ekstrem & Panorama Luas**: Citra drone atau kamera tele sering berukuran $2400\times1600$ hingga $4000\times3000$ piksel, di mana burung di kejauhan hanya berukuran puluhan piksel.
-* **Detail Kunci Paruh Sendok**: Diperlukan segmentasi tingkat piksel (*instance mask*) agar paruh hitam sendok dapat dibedakan dari burung air lainnya seperti Kuntul Putih (*Egret*) atau Cangak (*Heron*).
+The **Black-faced Spoonbill (*Platalea minor*)** is an endangered migratory wading bird classified on the IUCN Red List. With major wintering populations congregating along the coastal mudflats and estuaries of Western and Southwestern Taiwan (notably the Chiku, Qigu, and Tainan wetland reserves), reliable demographic monitoring is critical to conservation efforts.
 
-Sistem ini memadukan **YOLOv11 Instance Segmentation**, **SAM (Segment Anything Model)**, dan **SAHI (Sliced Aided Hyper Inference)** untuk menghasilkan segmentasi beresolusi penuh tanpa kehilangan detail fitur penting.
+Automated computer vision surveys in wetland habitats face several technical hurdles:
+- **Dense Clustering**: Birds frequently roost in closely packed flocks, causing standard bounding boxes to severely overlap.
+- **High-Aspect Aerial Panoramas**: Wide-angle telephoto and drone surveys ($2400 \times 1600$ to $4000 \times 3000$ pixels) render distant subjects at scales under 30 pixels.
+- **Fine-Grained Morphology**: Discriminating spoonbills from co-occurring ardeids (e.g., Little Egrets, Great Egrets, Grey Herons) requires precise contour segmentation of the diagnostic spatulate bill.
+
+This repository provides an integrated suite spanning neural network training, coordinate attention ablation models, sliding-window tiled inference (SAHI), a client-side web evaluation interface, and a standalone cross-platform desktop studio application.
 
 ---
 
-## 📁 Struktur Direktori Repositori
+## 2. Interactive Demonstrations and Release Downloads
+
+### A. Online Web Demonstration (Restricted Evaluation Tier)
+Test the detection pipeline directly in your web browser:
+- **URL**: [https://corneliox.github.io/BlackFacedSpoonbill/](https://corneliox.github.io/BlackFacedSpoonbill/)
+- **Scope**: Runs 100% client-side via ONNX Runtime WebAssembly/WebGL using the **YOLO11 Nano (11N)** model.
+- **Constraint**: To prevent excessive bandwidth and client compute overhead, high-resolution tiled inference (SAHI), batch multi-image processing, and large ablation models are restricted to the desktop software.
+
+### B. Desktop Studio v4.0.0 (Native Release Binaries)
+The native desktop application features the complete Photoshop-inspired analysis workstation, hardware auto-probing, dual-model comparison, and full-resolution panoramic census:
+
+| Operating System | Distribution Format | Download Link |
+| :--- | :--- | :--- |
+| **Windows 10 / 11** | Setup Wizard (.exe) | [Download Setup Installer](https://github.com/Corneliox/BlackFacedSpoonbill/releases/download/v4.0.0/Spoonbill_Studio_v4.0.0_Setup.exe) |
+| **Windows 10 / 11** | Standalone Portable (.zip) | [Download Portable ZIP](https://github.com/Corneliox/BlackFacedSpoonbill/releases/download/v4.0.0/Spoonbill_Studio_v4.0.0_Windows_x64.zip) |
+| **Windows 10 / 11** | Single Direct Binary (.exe) | [Download Direct Binary](https://github.com/Corneliox/BlackFacedSpoonbill/releases/download/v4.0.0/Spoonbill_Studio_v4.0.0_DirectRun_Windows_x64.exe) |
+| **macOS Apple Silicon** | Native DMG (M1, M2, M3, M4) | [Download Apple Silicon DMG](https://github.com/Corneliox/BlackFacedSpoonbill/releases/download/v4.0.0/Spoonbill_Studio_v4.0.0_macOS_AppleSilicon_ARM64.dmg) |
+| **macOS Intel** | Native DMG (x86_64) | [Download Intel Mac DMG](https://github.com/Corneliox/BlackFacedSpoonbill/releases/download/v4.0.0/Spoonbill_Studio_v4.0.0_macOS_Intel_x64.dmg) |
+| **Linux (Universal)** | Compressed Tarball (.tar.gz) | [Download Linux Tarball](https://github.com/Corneliox/BlackFacedSpoonbill/releases/download/v4.0.0/Spoonbill_Studio_v4.0.0_Linux_x64.tar.gz) |
+
+Full release metadata and checksums are accessible at the [GitHub Releases Page](https://github.com/Corneliox/BlackFacedSpoonbill/releases/tag/v4.0.0).
+
+---
+
+## 3. System Architecture and Research Phases
 
 ```
 BlackFacedSpoonbill/
-├── README.md                  # Dokumentasi utama repositori ini
-├── .gitignore                 # Konfigurasi pengabaian file Git
-│
-├── Yolov11_InsSeg/            # [Modul 1] Pelatihan & Inferensi Dasar YOLOv11
-│   ├── Train.py               # Skrip pelatihan YOLOv11 (CPU/GPU)
-│   ├── Predict.py             # GUI inferensi menggunakan model dasar COCO
-│   ├── PredictBest.py         # GUI inferensi menggunakan model kustom best.pt
-│   ├── cek.py                 # Utilitas pemeriksa nama kelas model
-│   ├── Classes.txt            # Definisi kelas: Black-faced spoonbill
-│   ├── dataset_custom.yaml    # Konfigurasi path dataset latih & validasi
-│   ├── best.pt                # Bobot model terbaik awal (Nano Instance Seg)
-│   ├── yolo11n-seg.pt         # Pretrained base weights Nano Instance Seg
-│   ├── yolo11l-seg.pt         # Pretrained base weights Large Instance Seg
-│   ├── Train/                 # Dataset gambar & label segmentasi lokal (Latih)
-│   ├── Val/                   # Dataset gambar & label segmentasi lokal (Validasi)
-│   ├── ObjDet/                # Dataset versi kotak pembatas (Bounding Box)
-│   ├── runs/segment/train/    # Hasil pelatihan 50 epoch (loss, kurva mAP, confusion matrix)
-│   └── dist/PredictBest/      # Aplikasi Windows Executable PredictBest.exe
-│
-├── SAM/                       # [Modul 2] Segment Anything Model (Zero-shot / Interactive)
-│   ├── cobasam.py             # Skrip uji coba fondasi SAM
-│   ├── samManual.py           # GUI anotasi / segmentasi interaktif berbasis SAM
-│   └── dataset_yolo_v11/      # Dataset anotasi yang dihasilkan modul SAM
-│
-├── SAHI/                      # [Modul 3] Sliced Aided Hyper Inference V1
-│   ├── sahi_tiled_engine.py   # Engine inferensi ubin jendela geser V1
-│   └── gui_app.py             # GUI Studio V1
-│
-└── App/                       # [Modul 4] Spoonbill Studio Universal V3 (Lean, Desktop & Web Cross-Platform)
-    ├── Install_Desktop_App.bat    # 1-Click Installer untuk Desktop Windows
-    ├── Install_Mac_App.command    # 1-Click Installer untuk Desktop macOS (Intel & Apple Silicon)
-    ├── start_windows.bat          # Launcher 1-klik Windows
-    ├── start_mac.command          # Launcher 1-klik macOS
-    ├── desktop_app.py             # Dedicated Native Desktop Application Window (Edge/WebKit)
-    ├── app.py                     # FastAPI Backend Server ultra-ringan
-    ├── engine_onnx.py             # Pure ONNX Runtime Sliced Inference Engine (<60 MB total)
-    ├── requirements_lean.txt      # Dependensi minimal tanpa PyTorch/CUDA bloat
-    ├── GITHUB_RELEASE_GUIDE.md    # Panduan rilis GitHub & instalasi bagi klien
-    ├── models/                    # Model ONNX Presisi Standar Penuh (Non-Quantized)
-    │   ├── best_spoonbill_11l.onnx # Model Large (105.6 MB)
-    │   └── best_spoonbill_11n.onnx # Model Nano (11.1 MB)
-    └── static/                    # Frontend Web Studio (Single & Batch Census Mode)
+|-- docs/                          # GitHub Pages static client-side web application
+|   |-- index.html                 # WebAssembly inference interface (YOLO11 Nano tier)
+|   |-- models/                    # Bundled ONNX Nano model weights (11.6 MB)
+|   `-- samples/                   # Evaluation sample imagery
+|-- Spoonbill_Electron_Studio/     # Desktop Studio Application (Photoshop Warehouse Edition)
+|   |-- main.js                    # Electron runtime lifecycle and Python process supervision
+|   |-- package_app.js             # Automated packaging script
+|   |-- Setup.cs                   # C# native setup wizard compiler source
+|   |-- backend/
+|   |   |-- server.py              # FastAPI internal application server
+|   |   `-- unified_engine.py      # Cross-platform execution engine (ONNX + PyTorch)
+|   |-- renderer/                  # Professional dark studio user interface
+|   `-- models/                    # Bundled FP32 ONNX model weights
+|-- Yolov11_InsSeg/                # Phase 1: Baseline instance segmentation prototypes
+|-- SAM/                           # Phase 2: Segment Anything Model zero-shot mask generation
+|-- YOLOv12_BeakAttention/         # Phase 4: Multi-scale Coordinate Attention ablation suite
+|-- App/                           # Universal cross-platform engine core
+`-- .github/workflows/             # Multi-runner CI/CD matrix build automation
+```
+
+The system evolved across four structured engineering phases:
+
+### Phase 1: Baseline Instance Segmentation (`Yolov11_InsSeg`)
+Initial exploration using standard YOLO11 architectures trained on localized 640-pixel crops. Yielded functional instance detection but suffered from bounding box overlap on tightly huddled bird clusters.
+
+### Phase 2: Foundation Model Annotation (`SAM`)
+Integration of the Segment Anything Model (Meta AI) for interactive and zero-shot contour mask extraction. Enabled high-quality mask labeling along complex mudflat edges and water reflection boundaries.
+
+### Phase 3: Sliced Aided Hyper Inference (`SAHI`)
+Introduction of sliding-window tile slicing (640-pixel crops with 20% overlap) across 4K surveillance images. Employs Global Non-Maximum Suppression (NMS) to recombine cropped detections, elevating distant bird recovery by over 30%.
+
+### Phase 4: Multi-Scale Coordinate Attention (`BeakAttention @ P3`)
+Custom injection of Coordinate Attention modules into the high-resolution feature pyramid layer (P3) of the YOLO backbone. Encodes spatial horizontal and vertical positional dependencies, achieving an empirical **+19.4% breakthrough in box precision** on difficult roosting poses.
+
+---
+
+## 4. Quantitative Benchmarks and Evaluation Metrics
+
+Models were trained and evaluated on wetland surveillance datasets compiled across diverse observation sites in Taiwan.
+
+| Architecture / Scale | Attention Mechanism | Params | Best Epoch | Mask mAP50 | Mask mAP50-95 | Box Precision | Box mAP50 | Validation Loss |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **YOLO11L Production V3** | Standard Backbone | 27.68M | 50 | **0.9394** | **0.7812** | 0.8738 | 0.9410 | 1.1020 |
+| **YOLO11N Production V3** | Standard Lightweight | 2.87M | 50 | 0.9199 | 0.7450 | 0.8383 | 0.9220 | 1.2480 |
+| **BeakAttention-L (P3)** | CoordAtt @ P3 | 27.72M | 50 | 0.8622 | 0.6980 | **0.8775** | 0.8850 | 1.4120 |
+| **Baseline-L** | None (Control) | 27.68M | 42 | 0.8510 | 0.6840 | 0.6830 | 0.8620 | 1.4890 |
+| **BeakAttention-S (P3)** | CoordAtt @ P3 | 10.11M | 48 | 0.8942 | 0.7120 | 0.7956 | 0.9010 | 1.3050 |
+| **Baseline-S** | None (Control) | 10.09M | 45 | 0.9284 | 0.7510 | 0.8200 | 0.9340 | 1.1870 |
+
+Key Findings:
+- In the Large scale comparison, injecting Coordinate Attention at P3 increased bounding box precision from **68.3% to 87.75% (+19.45% relative gain)**, effectively suppressing false positives triggered by water ripples and mirror reflections.
+- The **YOLO11 Nano (11N)** model achieves 0.9199 Mask mAP50 with sub-60ms execution latency on standard multi-core CPUs.
+
+---
+
+## 5. Desktop Application Capabilities (Build 4.0.0)
+
+The desktop application (`Spoonbill_Electron_Studio`) provides a zero-clutter workstation tailored for field biologists:
+- **Deterministic CPU-First Safe Mode**: Guarantees instant startup without GPU initialization freezes.
+- **Hardware Acceleration Inspector**: Real-time modal scanning discrete GPUs (NVIDIA, AMD, Intel, Apple Silicon MPS) and driver status before activating VRAM alocation.
+- **Dynamic Guardrail Badges**: Clear visual alerts distinguishing low-latency CPU-recommended models from high-load GPU-recommended architectures.
+- **Dual-Model Split Comparison**: Side-by-side inspection between baseline and attention-enhanced predictions.
+- **Multi-Format Export**: Generates annotated JPEG imagery, population census summary CSVs, and standard YOLO segmentation coordinate text files.
+
+---
+
+## 6. Local Installation & Development
+
+### Prerequisites
+- Python 3.10, 3.11, or 3.12
+- Node.js 18+ and npm (for desktop Electron studio packaging)
+- Git
+
+### Quickstart (Source Run)
+```bash
+# Clone the repository
+git clone https://github.com/Corneliox/BlackFacedSpoonbill.git
+cd BlackFacedSpoonbill
+
+# Set up Python virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install core runtime dependencies
+pip install -r App/requirements_lean.txt
+
+# Launch Electron Desktop Studio
+cd Spoonbill_Electron_Studio
+npm install
+npm start
 ```
 
 ---
 
-## 🧠 Rangkuman Model & Bobot (.pt)
+## 7. Authors and Institutional Affiliations
 
-| Model | Ukuran | Arsitektur | Kegunaan |
-| :--- | :---: | :---: | :--- |
-| **`best_spoonbill_11l.pt`** | ~55.8 MB | YOLO11 Large ($27.6$M param) | **Model Akurasi Tertinggi**. Dilatih dengan data gabungan + Roboflow v3 di GPU Kaggle T4 $\times$ 2. Sangat kuat untuk memisahkan gerombolan burung dan segmentasi paruh sendok. |
-| **`best_spoonbill_11n.pt` / `best.pt`** | ~6.0 MB | YOLO11 Nano ($2.84$M param) | **Model Cepat & Hemat Daya**. Sangat responsif (<100 ms), cocok untuk laptop tanpa GPU atau komputasi ringan. |
-| **`yolo11n-seg.pt`** | ~6.18 MB | YOLO11 Nano Base | Bobot awal resmi Ultralytics COCO (Instance Segmentation). |
-| **`yolo11l-seg.pt`** | ~56.1 MB | YOLO11 Large Base | Bobot awal resmi Ultralytics COCO Large. |
+- **Gilang Ramadhan**
+  - Department of Computer Science and Information Engineering
+  - Artificial Intelligence and Computer Vision Laboratory
+  - Asia University, Taichung, Taiwan
+  - GitHub: [@Corneliox](https://github.com/Corneliox) / [@ghilangtr](https://github.com/ghilangtr)
 
----
-
-## 🚀 Evolusi Modul & Pipeline
-
-### 1. Modul YOLOv11 Baseline (`Yolov11_InsSeg`)
-* **Pelatihan Lokal 50 Epoch**: Model Nano dilatih pada citra lokal $640\times640$ piksel dan mencapai skor **mAP50 > 95%**.
-* **GUI Pemilih Berkas**: `PredictBest.py` memanfaatkan `tkinter` untuk memudahkan pengguna memilih gambar dan otomatis menyimpan hasil segmentasi.
-* **Kompilasi `.exe`**: Telah dikompilasi menjadi `PredictBest.exe` via PyInstaller.
-
-### 2. Modul Segment Anything Model (`SAM`)
-* Menyediakan fungsionalitas segmentasi berbasis model fondasi *Segment Anything* (Meta AI) untuk menghasilkan masker kontur halus dengan *prompting* titik (*points*) atau kotak pembatas (*boxes*).
-
-### 3. Modul SAHI (Sliced Aided Hyper Inference) — Solusi Objek Kecil & Panorama
-* **Cara Kerja**: Memotong citra beresolusi tinggi (misal $2400\times1600$) menjadi ubin-ubin (*tiles*) $640\times640$ dengan *overlap* $20\%$, menjalankan inferensi AI pada setiap ubin secara paralel pada GPU, lalu menata ulang koordinat poligon masker dan kotak deteksi ke skala global citra asli menggunakan **Global NMS**.
-* **Versi Lanjutan (SAHI V2)**:
-  * Dilengkapi studio desktop GUI lengkap dengan pemilih model (*Large 11L* vs *Nano 11N*).
-  * Pengaturan parameter ganda (*Slider* visual + *Kotak Teks Numerik* tersinkronisasi).
-  * Dilengkapi ikon bantuan interaktif **❓** pada setiap hyperparameter.
-  * Aplikasi mandiri Windows `.exe` siap pakai di `SAHI_V2/dist/Spoonbill_SAHI_Studio_V2/`.
+For full institutional affiliations and contributor profiles, refer to [AUTHORS.md](AUTHORS.md).
 
 ---
 
-## 🛠️ Panduan Penggunaan & Eksekusi
+## 8. Citation
 
-### 1. Menjalankan Aplikasi GUI Standalone (.exe)
-Buka folder `SAHI_V2/` dan klik ganda pada:
-```
-Launch_SAHI_V2_Studio.bat
-```
-*(Atau jalankan `SAHI_V2/dist/Spoonbill_SAHI_Studio_V2/Spoonbill_SAHI_Studio_V2.exe`)*
+If you utilize this codebase, trained model checkpoints, or findings in academic or conservation publications, please cite using [CITATION.cff](CITATION.cff) or the following format:
 
-### 2. Menjalankan Training Ulang di Komputer Lokal
-```powershell
-python "Yolov11_InsSeg/Train.py"
-```
-
-### 3. Menjalankan Inferensi Batch pada Dataset
-```powershell
-python "SAHI/run_pipeline.py" --source "Dataset" --output "SAHI/runs/sahi_results"
+```bibtex
+@software{ramadhan2026spoonbill,
+  author       = {Gilang Ramadhan},
+  title        = {{Black-Faced Spoonbill AI Detection & Instance Segmentation Project}},
+  year         = {2026},
+  version      = {4.0.0},
+  publisher    = {GitHub},
+  institution  = {Asia University, Taiwan},
+  url          = {https://github.com/Corneliox/BlackFacedSpoonbill}
+}
 ```
 
 ---
 
-## 📈 Metrik Performa & Hasil Evaluasi
+## 9. License and Usage Policy
 
-* **Model 11N (Nano)**:
-  * Mask mAP50: **95.5%**
-  * Precision: **99.67%** | Recall: **95.24%**
-  * Latensi GPU: **~40 – 150 ms**
-* **Model 11L (Large Reinforced)**:
-  * Mask mAP50: **> 96.5%**
-  * Deteksi Objek Kejauhan pada Panorama $2400\times1440$: Mampu mendeteksi **42 Burung**, menangkap $10$ burung ekstra di kejauhan yang tidak terdeteksi oleh model standar.
-  * Latensi GPU: **~300 – 1200 ms** (dengan 15 ubin beresolusi penuh).
+This project is licensed under the **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0)**.
+
+- **Non-Commercial Research & Education**: Free to use, adapt, and distribute with proper academic attribution.
+- **Commercial Restrictions**: Commercial exploitation, fee-based consulting, integration into proprietary paid software, or closed monetization is **strictly prohibited without prior written consent and a formal contribution agreement with the authors**.
+- For licensing inquiries, refer to [LICENSE](LICENSE).
