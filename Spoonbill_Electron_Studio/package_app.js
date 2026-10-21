@@ -9,7 +9,7 @@ const { execSync } = require('child_process');
 
 const ROOT_DIR = __dirname;
 const ELECTRON_DIST = path.join(ROOT_DIR, 'node_modules', 'electron', 'dist');
-const OUTPUT_DIR = path.join(ROOT_DIR, 'dist', 'Spoonbill_Studio_v4.1.0_Experimental_Windows_x64');
+const OUTPUT_DIR = path.join(ROOT_DIR, 'dist', 'Spoonbill_Studio_v4.1.0_Windows_x64');
 const APP_DEST = path.join(OUTPUT_DIR, 'resources', 'app');
 
 function copyRecursiveSync(src, dest) {

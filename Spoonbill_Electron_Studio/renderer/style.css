@@ -1159,16 +1159,22 @@ body {
 /* ==========================================================================
    8. V4.1 EXPERIMENTAL: NON-DESTRUCTIVE FLOATING INFO HUD & CUSTOMIZER TAB
    ========================================================================== */
-.ps-exp-badge {
+.ps-exp-badge, .ps-version-badge {
   font-size: 0.60rem;
   font-family: var(--font-mono);
   font-weight: 700;
   letter-spacing: 0.04em;
-  padding: 2px 6px;
+  padding: 2px 7px;
   border-radius: 4px;
-  background: rgba(246, 130, 31, 0.16);
-  color: var(--ps-accent);
-  border: 1px solid rgba(246, 130, 31, 0.42);
+  background: rgba(16, 185, 129, 0.16);
+  color: #10B981;
+  border: 1px solid rgba(16, 185, 129, 0.42);
+  transition: all 0.15s ease;
+}
+
+.ps-exp-badge:hover, .ps-version-badge:hover {
+  background: rgba(16, 185, 129, 0.28);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.45);
 }
 
 /* INSPECTOR SEGMENTED TABS */

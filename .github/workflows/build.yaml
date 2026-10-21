@@ -74,10 +74,12 @@ jobs:
           # 1. Build Standalone 1-File Executable (.exe ready to run)
           pyinstaller --noconfirm --onefile --windowed --icon "icon.ico" --name "Spoonbill_Studio_v4.0.0_DirectRun_Windows_x64" --paths "../Spoonbill_Electron_Studio/backend" --add-data "../Spoonbill_Electron_Studio/backend;backend" --add-data "../Spoonbill_Electron_Studio/renderer;renderer" --add-data "../Spoonbill_Electron_Studio/samples;samples" --add-data "../Spoonbill_Electron_Studio/Comprehensive_Model_Evolution_Benchmark.csv;." --add-data "static;static" --add-data "models;models" --hidden-import "server" --hidden-import "unified_engine" --hidden-import "uvicorn.logging" --hidden-import "uvicorn.loops.auto" --hidden-import "uvicorn.protocols.http.auto" --hidden-import "uvicorn.lifespan.on" --hidden-import "multipart" --hidden-import "python_multipart" desktop_app.py
           Move-Item "dist/Spoonbill_Studio_v4.0.0_DirectRun_Windows_x64.exe" "dist_release/" -Force
+          Copy-Item "dist_release/Spoonbill_Studio_v4.0.0_DirectRun_Windows_x64.exe" "dist_release/Spoonbill_Studio_v4.1.0_DirectRun_Windows_x64.exe" -Force
 
           # 2. Build Onedir Folder & ZIP
           pyinstaller --noconfirm --onedir --windowed --icon "icon.ico" --name "Spoonbill_AI_Studio" --paths "../Spoonbill_Electron_Studio/backend" --add-data "../Spoonbill_Electron_Studio/backend;backend" --add-data "../Spoonbill_Electron_Studio/renderer;renderer" --add-data "../Spoonbill_Electron_Studio/samples;samples" --add-data "../Spoonbill_Electron_Studio/Comprehensive_Model_Evolution_Benchmark.csv;." --add-data "static;static" --add-data "models;models" --hidden-import "server" --hidden-import "unified_engine" --hidden-import "uvicorn.logging" --hidden-import "uvicorn.loops.auto" --hidden-import "uvicorn.protocols.http.auto" --hidden-import "uvicorn.lifespan.on" --hidden-import "multipart" --hidden-import "python_multipart" desktop_app.py
           Compress-Archive -Path "dist/Spoonbill_AI_Studio/*" -DestinationPath "dist_release/Spoonbill_Studio_v4.0.0_DirectRun_Windows_x64_Portable.zip" -Force
+          Copy-Item "dist_release/Spoonbill_Studio_v4.0.0_DirectRun_Windows_x64_Portable.zip" "dist_release/Spoonbill_Studio_v4.1.0_DirectRun_Windows_x64_Portable.zip" -Force
 
       # ── Build macOS Intel .DMG (Slim Signed V4.1 Studio + Icon + Gatekeeper Unlocker) ──
       - name: Build macOS Intel .DMG
@@ -149,10 +151,10 @@ jobs:
           cp README_MAC_USERS.txt dmg_tmp/README_MAC_USERS.txt
           ln -s /Applications dmg_tmp/Applications
           hdiutil create -volname "Spoonbill AI Studio" -srcfolder dmg_tmp -ov -format UDZO -imagekey zlib-level=9 "dist_release/Spoonbill_Studio_v4.0.0_macOS_Intel_x64.dmg"
-          cp "dist_release/Spoonbill_Studio_v4.0.0_macOS_Intel_x64.dmg" "dist_release/Spoonbill_Studio_v4.1.0_Experimental_macOS_Intel_x64.dmg"
+          cp "dist_release/Spoonbill_Studio_v4.0.0_macOS_Intel_x64.dmg" "dist_release/Spoonbill_Studio_v4.1.0_macOS_Intel_x64.dmg"
           ls -lh dist_release/
+          gh release upload v4.1.0 "dist_release/Spoonbill_Studio_v4.1.0_macOS_Intel_x64.dmg" --clobber || true
           gh release upload v4.0.0 "dist_release/Spoonbill_Studio_v4.0.0_macOS_Intel_x64.dmg" --clobber || true
-          gh release upload v4.1.0-experimental "dist_release/Spoonbill_Studio_v4.1.0_Experimental_macOS_Intel_x64.dmg" "dist_release/Spoonbill_Studio_v4.0.0_macOS_Intel_x64.dmg" --clobber || true
 
       # ── Build macOS Apple Silicon .DMG (Slim Signed V4.1 Studio + Icon + Gatekeeper Unlocker) ──
       - name: Build macOS Apple Silicon .DMG
@@ -224,10 +226,10 @@ jobs:
           cp README_MAC_USERS.txt dmg_tmp/README_MAC_USERS.txt
           ln -s /Applications dmg_tmp/Applications
           hdiutil create -volname "Spoonbill AI Studio" -srcfolder dmg_tmp -ov -format UDZO -imagekey zlib-level=9 "dist_release/Spoonbill_Studio_v4.0.0_macOS_AppleSilicon_ARM64.dmg"
-          cp "dist_release/Spoonbill_Studio_v4.0.0_macOS_AppleSilicon_ARM64.dmg" "dist_release/Spoonbill_Studio_v4.1.0_Experimental_macOS_AppleSilicon_ARM64.dmg"
+          cp "dist_release/Spoonbill_Studio_v4.0.0_macOS_AppleSilicon_ARM64.dmg" "dist_release/Spoonbill_Studio_v4.1.0_macOS_AppleSilicon_ARM64.dmg"
           ls -lh dist_release/
+          gh release upload v4.1.0 "dist_release/Spoonbill_Studio_v4.1.0_macOS_AppleSilicon_ARM64.dmg" --clobber || true
           gh release upload v4.0.0 "dist_release/Spoonbill_Studio_v4.0.0_macOS_AppleSilicon_ARM64.dmg" --clobber || true
-          gh release upload v4.1.0-experimental "dist_release/Spoonbill_Studio_v4.1.0_Experimental_macOS_AppleSilicon_ARM64.dmg" "dist_release/Spoonbill_Studio_v4.0.0_macOS_AppleSilicon_ARM64.dmg" --clobber || true
 
       # ── Build Linux Installer & Universal Suite ──────────────────────────────
       - name: Build Linux Installer (.tar.gz) & Universal Portable (.zip)
@@ -238,8 +240,10 @@ jobs:
           chmod +x Install_Linux_App.sh Install_Mac_App.command Unlock_and_Open_Mac.command
           # 1. Linux Installer Package (.tar.gz)
           tar -czvf dist_release/Spoonbill_Studio_v4.0.0_Linux_x64.tar.gz --exclude="dist*" --exclude="__pycache__*" --exclude="runs*" .
+          cp "dist_release/Spoonbill_Studio_v4.0.0_Linux_x64.tar.gz" "dist_release/Spoonbill_Studio_v4.1.0_Linux_x64.tar.gz"
           # 2. Universal Portable Package (.zip)
           zip -r dist_release/Spoonbill_Studio_v4.0.0_Universal_Source.zip . -x "__pycache__/*" "runs/*" "*.tmp" "dist/*" "dist_release/*"
+          cp "dist_release/Spoonbill_Studio_v4.0.0_Universal_Source.zip" "dist_release/Spoonbill_Studio_v4.1.0_Universal_Source.zip"
 
       # ── Build Electron Studio Package (Windows) ──────────────────────────────
       - name: Setup Node.js for Electron Studio

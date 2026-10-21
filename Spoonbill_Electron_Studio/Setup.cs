@@ -424,7 +424,7 @@ public class SpoonbillNvidiaInstaller : Form
 
     public SpoonbillNvidiaInstaller()
     {
-        this.Text = "Spoonbill AI Studio v4.1 (Experimental) — Setup Wizard";
+        this.Text = "Spoonbill AI Studio v4.1 (Stable) — Setup Wizard";
         this.ClientSize = new Size(FormWidth, FormHeight);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -496,7 +496,7 @@ public class SpoonbillNvidiaInstaller : Form
         sidebarPanel.Controls.Add(emblemPanel);
 
         sidebarPanel.Controls.Add(MakeLabel("SPOONBILL AI", new Font("Segoe UI", 11F, FontStyle.Bold), Color.White, new Point(64, 20), Size.Empty));
-        sidebarPanel.Controls.Add(MakeLabel("Studio Wizard v4.1 EXP", new Font("Segoe UI", 8F, FontStyle.Regular), ClrNvidiaGreen, new Point(65, 40), Size.Empty));
+        sidebarPanel.Controls.Add(MakeLabel("Studio Wizard v4.1", new Font("Segoe UI", 8F, FontStyle.Regular), ClrNvidiaGreen, new Point(65, 40), Size.Empty));
 
         string[] stepTitles = new string[] {
             "System Check",
@@ -604,7 +604,7 @@ public class SpoonbillNvidiaInstaller : Form
         this.Controls.Add(bottomPanel);
 
         lblVersionInfo = MakeLabel(
-            "Spoonbill AI Studio v4.1.0-experimental (x64 CPU Safe Mode & NVIDIA CUDA)",
+            "Spoonbill AI Studio v4.1.0 (x64 CPU Safe Mode & NVIDIA CUDA)",
             new Font("Segoe UI", 8F),
             ClrTextSecondary,
             new Point(22, 21),
@@ -2277,8 +2277,8 @@ public class SpoonbillNvidiaInstaller : Form
             {
                 if (key != null)
                 {
-                    key.SetValue("DisplayName", "Black-Faced Spoonbill AI Studio v4.1 (Experimental)");
-                    key.SetValue("DisplayVersion", "4.1.0-experimental");
+                    key.SetValue("DisplayName", "Black-Faced Spoonbill AI Studio v4.1");
+                    key.SetValue("DisplayVersion", "4.1.0");
                     key.SetValue("Publisher", "Black-Faced Spoonbill AI Research Consortium");
                     key.SetValue("InstallLocation", targetDir);
                     key.SetValue("UninstallString", "\"" + uninstallerExe + "\"");

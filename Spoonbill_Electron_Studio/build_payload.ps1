@@ -3,9 +3,9 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $scriptDir
 
-$studioDist = "dist\Spoonbill_Studio_v4.1.0_Experimental_Windows_x64"
-$portableZip = "dist\Spoonbill_Studio_v4.1.0_Experimental_Windows_x64.zip"
-$outExe = "dist\Spoonbill_Studio_v4.1.0_Experimental_Setup.exe"
+$studioDist = "dist\Spoonbill_Studio_v4.1.0_Windows_x64"
+$portableZip = "dist\Spoonbill_Studio_v4.1.0_Windows_x64.zip"
+$outExe = "dist\Spoonbill_Studio_v4.1.0_Setup.exe"
 $setupCs = "Setup.cs"
 $uninstallCs = "Uninstall.cs"
 $uninstallExe = "$studioDist\Uninstall.exe"
