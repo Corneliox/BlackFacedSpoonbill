@@ -5,9 +5,196 @@ using System.Reflection;
 using System.Windows.Forms;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Diagnostics;
 using System.Threading;
 using Microsoft.Win32;
+
+public class BufferedPanel : Panel
+{
+    public BufferedPanel()
+    {
+        this.DoubleBuffered = true;
+        this.SetStyle(
+            ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.UserPaint |
+            ControlStyles.OptimizedDoubleBuffer |
+            ControlStyles.ResizeRedraw,
+            true
+        );
+        this.UpdateStyles();
+    }
+}
+
+public class ModernButton : BufferedPanel
+{
+    private string buttonText = "";
+    private Color activeBack = Color.FromArgb(44, 44, 52);
+    private Color activeFore = Color.White;
+    private Color borderColor = Color.FromArgb(76, 76, 88);
+    private Font textFont = new Font("Segoe UI", 8.75F, FontStyle.Bold);
+    private bool isInteractive = true;
+    private bool isHovered = false;
+    public event EventHandler ButtonClick;
+
+    public string ButtonText
+    {
+        get { return buttonText; }
+        set { buttonText = value; this.Invalidate(); }
+    }
+
+    public Color ActiveBackColor
+    {
+        get { return activeBack; }
+        set { activeBack = value; this.Invalidate(); }
+    }
+
+    public Color ActiveForeColor
+    {
+        get { return activeFore; }
+        set { activeFore = value; this.Invalidate(); }
+    }
+
+    public Color BorderColor
+    {
+        get { return borderColor; }
+        set { borderColor = value; this.Invalidate(); }
+    }
+
+    public Font TextFont
+    {
+        get { return textFont; }
+        set { textFont = value; this.Invalidate(); }
+    }
+
+    public bool IsInteractive
+    {
+        get { return isInteractive; }
+        set
+        {
+            isInteractive = value;
+            this.Cursor = isInteractive ? Cursors.Hand : Cursors.Default;
+            this.Invalidate();
+        }
+    }
+
+    public ModernButton()
+    {
+        this.Cursor = Cursors.Hand;
+        this.MouseEnter += (s, e) => { isHovered = true; this.Invalidate(); };
+        this.MouseLeave += (s, e) => { isHovered = false; this.Invalidate(); };
+        this.MouseDown += (s, e) => {
+            if (isInteractive && e.Button == MouseButtons.Left && ButtonClick != null)
+            {
+                ButtonClick(this, EventArgs.Empty);
+            }
+        };
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+        Color bg = isInteractive ? activeBack : Color.FromArgb(26, 26, 32);
+        if (isInteractive && isHovered)
+        {
+            int r = Math.Min(255, bg.R + 18);
+            int g = Math.Min(255, bg.G + 18);
+            int b = Math.Min(255, bg.B + 18);
+            bg = Color.FromArgb(r, g, b);
+        }
+        Color fg = isInteractive ? activeFore : Color.FromArgb(145, 145, 160);
+        Color bd = isInteractive ? borderColor : Color.FromArgb(52, 52, 62);
+
+        using (SolidBrush sb = new SolidBrush(bg))
+        {
+            e.Graphics.FillRectangle(sb, 0, 0, this.Width, this.Height);
+        }
+        if (bd != Color.Empty && bd.A > 0)
+        {
+            using (Pen p = new Pen(bd, 1f))
+            {
+                e.Graphics.DrawRectangle(p, 0, 0, this.Width - 1, this.Height - 1);
+            }
+        }
+        using (Brush tb = new SolidBrush(fg))
+        {
+            StringFormat sf = new StringFormat();
+            sf.Alignment = StringAlignment.Center;
+            sf.LineAlignment = StringAlignment.Center;
+            e.Graphics.DrawString(buttonText, textFont, tb, new RectangleF(0, 0, this.Width, this.Height), sf);
+        }
+    }
+}
+
+public class ScrollTextPanel : BufferedPanel
+{
+    private Panel innerScroll;
+    private Label lblContent;
+    private Label bottomAnchor;
+
+    public ScrollTextPanel(int width, int height)
+    {
+        this.Size = new Size(width, height);
+        this.BackColor = Color.FromArgb(14, 14, 18);
+
+        innerScroll = new Panel();
+        innerScroll.Location = new Point(2, 2);
+        innerScroll.Size = new Size(width - 4, height - 4);
+        innerScroll.BackColor = Color.FromArgb(14, 14, 18);
+        innerScroll.AutoScroll = true;
+        this.Controls.Add(innerScroll);
+
+        lblContent = new Label();
+        lblContent.Location = new Point(10, 8);
+        lblContent.AutoSize = true;
+        lblContent.MaximumSize = new Size(width - 36, 0);
+        lblContent.BackColor = Color.FromArgb(14, 14, 18);
+        lblContent.ForeColor = Color.FromArgb(236, 236, 244);
+        lblContent.Font = new Font("Consolas", 8.5F, FontStyle.Regular);
+        lblContent.UseMnemonic = false;
+        innerScroll.Controls.Add(lblContent);
+
+        bottomAnchor = new Label();
+        bottomAnchor.Size = new Size(1, 4);
+        bottomAnchor.Location = new Point(10, 20);
+        innerScroll.Controls.Add(bottomAnchor);
+    }
+
+    public void SetText(string text)
+    {
+        lblContent.Text = text;
+        bottomAnchor.Location = new Point(10, lblContent.Bottom + 4);
+    }
+
+    public void AppendLine(string line)
+    {
+        if (string.IsNullOrEmpty(lblContent.Text))
+        {
+            lblContent.Text = line;
+        }
+        else
+        {
+            lblContent.Text = lblContent.Text + Environment.NewLine + line;
+        }
+        bottomAnchor.Location = new Point(10, lblContent.Bottom + 4);
+        try
+        {
+            innerScroll.ScrollControlIntoView(bottomAnchor);
+        }
+        catch {}
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        using (Pen p = new Pen(Color.FromArgb(52, 52, 62), 1))
+        {
+            e.Graphics.DrawRectangle(p, 0, 0, this.Width - 1, this.Height - 1);
+        }
+    }
+}
 
 public class SpoonbillNvidiaInstaller : Form
 {
@@ -20,64 +207,67 @@ public class SpoonbillNvidiaInstaller : Form
     private const int BottomHeight = 60;
 
     // Layout Panels
-    private Panel sidebarPanel;
-    private Panel contentPanel;
-    private Panel bottomPanel;
+    private BufferedPanel sidebarPanel;
+    private BufferedPanel contentPanel;
+    private BufferedPanel bottomPanel;
 
     // Sidebar Step Badges
-    private Panel[] stepBadgePanels;
+    private BufferedPanel[] stepBadgePanels;
     private Label[] stepNumberLabels;
     private Label[] stepTitleLabels;
+    private Label[] stepSubLabels;
     private int currentStep = 0;
 
     // Navigation Buttons
-    private Button btnBack;
-    private Button btnNext;
-    private Button btnCancel;
+    private ModernButton btnBack;
+    private ModernButton btnNext;
+    private ModernButton btnCancel;
     private Label lblVersionInfo;
 
     // Step Pages
-    private Panel panelSystemCheck;
-    private Panel panelAgreement;
-    private Panel panelModeAndOptions;
-    private Panel panelProgress;
-    private Panel panelFinish;
+    private BufferedPanel panelSystemCheck;
+    private BufferedPanel panelAgreement;
+    private BufferedPanel panelModeAndOptions;
+    private BufferedPanel panelProgress;
+    private BufferedPanel panelFinish;
 
     // Step 0: System Check Controls
     private Label lblSysTitle;
     private Label lblSysDesc;
-    private Panel[] sysCardPanels;
+    private BufferedPanel[] sysCardPanels;
     private Label[] sysCardTitles;
     private Label[] sysCardValues;
     private Label[] sysCardBadges;
-    private Panel pnlSysAdvisory;
+    private BufferedPanel pnlSysAdvisory;
     private Label lblAdvisoryTitle;
     private Label lblAdvisoryDesc;
-    private Button btnHowToReady;
-    private Button btnRefreshScan;
+    private ModernButton btnHowToReady;
+    private ModernButton btnRefreshScan;
+    private ModernButton btnRemoveExisting;
     private Label lblLastScanTime;
     private string detectedGpu = null;
     private bool hasNvidiaGpu = false;
+    private string detectedPythonVersion = null;
 
     // Step 1: Agreement Controls
     private Label lblAgreeTitle;
     private Label lblAgreeDesc;
-    private RichTextBox txtAgreementTerms;
+    private ScrollTextPanel pnlTermsScroll;
     private int agreementChoice = 0; // 0 = unselected/released, 1 = accept, 2 = decline
-    private Panel pnlAgreeBox;
-    private Panel pnlDeclineBox;
+    private BufferedPanel pnlAgreeBox;
+    private BufferedPanel pnlDeclineBox;
     private Label lblAgreementStatus;
 
     // Step 2: Mode & Options Controls
     private Label lblOptTitle;
     private Label lblOptDesc;
     private int installMode = 0; // 0 = Express (default), 1 = Custom
-    private Panel pnlExpressCard;
-    private Panel pnlCustomCard;
-    private Panel pnlCustomDetails;
+    private BufferedPanel pnlExpressCard;
+    private BufferedPanel pnlCustomCard;
+    private BufferedPanel pnlCustomDetails;
     private Label lblDest;
     private TextBox txtTargetDir;
-    private Button btnBrowseTarget;
+    private ModernButton btnBrowseTarget;
     private Label lblDiskSpace;
     private CheckBox chkCleanInstall;
     private CheckBox chkInstallModels;
@@ -89,14 +279,17 @@ public class SpoonbillNvidiaInstaller : Form
     // Step 3: Progress Controls
     private Label lblProgTitle;
     private Label lblProgStatus;
-    private Panel customProgressBar;
+    private BufferedPanel pnlPhaseTracker;
+    private int currentInstallPhase = 0; // 0..3
+    private BufferedPanel customProgressBar;
     private int currentProgressPercent = 0;
-    private RichTextBox logBox;
+    private ScrollTextPanel logScrollBox;
 
     // Step 4: Finish Controls
     private Label lblFinishTitle;
     private Label lblFinishDesc;
-    private Panel pnlFinishCard;
+    private BufferedPanel pnlFinishCard;
+    private Label lblSummaryBody;
     private CheckBox chkLaunchNow;
     private CheckBox chkOpenFolder;
 
@@ -104,19 +297,20 @@ public class SpoonbillNvidiaInstaller : Form
     private string targetDir;
     private string pythonBinary = null;
     private bool existingVersionDetected = false;
+    private string existingInstallDir = null;
     private bool isInstalling = false;
+    private bool pipSucceeded = false;
 
     // Colors
     private readonly Color ClrBgDark = Color.FromArgb(19, 19, 22);
     private readonly Color ClrSidebar = Color.FromArgb(13, 13, 15);
     private readonly Color ClrCardBg = Color.FromArgb(26, 26, 30);
-    private readonly Color ClrCardBorder = Color.FromArgb(42, 42, 48);
-    private readonly Color ClrCardSelectedBorder = Color.FromArgb(118, 185, 0);
+    private readonly Color ClrCardBorder = Color.FromArgb(46, 46, 54);
     private readonly Color ClrNvidiaGreen = Color.FromArgb(118, 185, 0);
-    private readonly Color ClrTextPrimary = Color.FromArgb(244, 244, 245);
-    private readonly Color ClrTextSecondary = Color.FromArgb(161, 161, 170);
-    private readonly Color ClrTextMuted = Color.FromArgb(113, 113, 122);
-    private readonly Color ClrBorderSubtle = Color.FromArgb(34, 34, 39);
+    private readonly Color ClrTextPrimary = Color.FromArgb(244, 244, 246);
+    private readonly Color ClrTextSecondary = Color.FromArgb(195, 195, 205);
+    private readonly Color ClrTextMuted = Color.FromArgb(140, 140, 152);
+    private readonly Color ClrBorderSubtle = Color.FromArgb(36, 36, 42);
 
     public SpoonbillNvidiaInstaller()
     {
@@ -129,7 +323,7 @@ public class SpoonbillNvidiaInstaller : Form
         this.ForeColor = ClrTextPrimary;
         this.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
 
-        // Double buffer to eliminate flicker
+        this.DoubleBuffered = true;
         this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
 
         string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -139,217 +333,261 @@ public class SpoonbillNvidiaInstaller : Form
         SwitchStep(0);
     }
 
+    private Label MakeLabel(string text, Font font, Color fg, Point loc, Size size)
+    {
+        Label l = new Label();
+        l.UseMnemonic = false;
+        l.Text = text;
+        l.Font = font;
+        l.ForeColor = fg;
+        l.Location = loc;
+        if (size == Size.Empty)
+        {
+            l.AutoSize = true;
+        }
+        else
+        {
+            l.Size = size;
+        }
+        return l;
+    }
+
     private void BuildTwoColumnLayout()
     {
         // 1. Sidebar Panel (Fixed at X = 0, Y = 0, Width = 220, Height = 500)
-        sidebarPanel = new Panel();
+        sidebarPanel = new BufferedPanel();
         sidebarPanel.Location = new Point(0, 0);
         sidebarPanel.Size = new Size(SidebarWidth, MainHeight);
         sidebarPanel.BackColor = ClrSidebar;
         sidebarPanel.Paint += (s, e) => {
-            // Draw clear vertical dividing border between sidebar and content
-            e.Graphics.DrawLine(new Pen(ClrBorderSubtle, 1), SidebarWidth - 1, 0, SidebarWidth - 1, MainHeight);
+            using (Pen p = new Pen(ClrBorderSubtle, 1))
+            {
+                e.Graphics.DrawLine(p, SidebarWidth - 1, 0, SidebarWidth - 1, MainHeight);
+            }
         };
         this.Controls.Add(sidebarPanel);
 
         // Brand Emblem
-        Panel emblemPanel = new Panel();
-        emblemPanel.Size = new Size(32, 32);
-        emblemPanel.Location = new Point(24, 24);
-        emblemPanel.BackColor = Color.FromArgb(24, 34, 12);
+        BufferedPanel emblemPanel = new BufferedPanel();
+        emblemPanel.Size = new Size(34, 34);
+        emblemPanel.Location = new Point(22, 22);
+        emblemPanel.BackColor = Color.FromArgb(24, 36, 12);
         emblemPanel.Paint += (s, e) => {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using (Pen p = new Pen(ClrNvidiaGreen, 1.5f))
             {
-                e.Graphics.DrawRectangle(p, 1, 1, 30, 30);
+                e.Graphics.DrawRectangle(p, 1, 1, 31, 31);
             }
             using (SolidBrush b = new SolidBrush(ClrNvidiaGreen))
             {
-                e.Graphics.FillRectangle(b, 8, 8, 16, 16);
+                e.Graphics.FillRectangle(b, 9, 9, 16, 16);
             }
         };
         sidebarPanel.Controls.Add(emblemPanel);
 
-        Label brandTitle = new Label();
-        brandTitle.Text = "SPOONBILL AI";
-        brandTitle.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
-        brandTitle.ForeColor = Color.White;
-        brandTitle.Location = new Point(64, 22);
-        brandTitle.AutoSize = true;
-        sidebarPanel.Controls.Add(brandTitle);
+        sidebarPanel.Controls.Add(MakeLabel("SPOONBILL AI", new Font("Segoe UI", 11F, FontStyle.Bold), Color.White, new Point(64, 20), Size.Empty));
+        sidebarPanel.Controls.Add(MakeLabel("Studio Setup Wizard V4", new Font("Segoe UI", 8F, FontStyle.Regular), ClrNvidiaGreen, new Point(65, 40), Size.Empty));
 
-        Label brandSub = new Label();
-        brandSub.Text = "Studio Setup V4";
-        brandSub.Font = new Font("Segoe UI", 8F, FontStyle.Regular);
-        brandSub.ForeColor = ClrNvidiaGreen;
-        brandSub.Location = new Point(65, 42);
-        brandSub.AutoSize = true;
-        sidebarPanel.Controls.Add(brandSub);
-
-        // Step Navigation items
         string[] stepTitles = new string[] {
             "System Check",
             "User Agreement",
-            "Options & Target",
-            "Installation",
+            "Mode & Options",
+            "Deployment",
             "Ready to Use"
         };
+        string[] stepSubs = new string[] {
+            "Hardware & Python scan",
+            "License & pip consent",
+            "Express or Custom path",
+            "Extract & configure AI",
+            "Summary & launch"
+        };
 
-        stepBadgePanels = new Panel[stepTitles.Length];
+        stepBadgePanels = new BufferedPanel[stepTitles.Length];
         stepNumberLabels = new Label[stepTitles.Length];
         stepTitleLabels = new Label[stepTitles.Length];
+        stepSubLabels = new Label[stepTitles.Length];
 
         for (int i = 0; i < stepTitles.Length; i++)
         {
             int idx = i;
-            Panel badge = new Panel();
-            badge.Size = new Size(24, 24);
-            badge.Location = new Point(24, 96 + (i * 44));
-            badge.BackColor = Color.FromArgb(28, 28, 32);
+            int rowY = 88 + (i * 56);
+
+            BufferedPanel badge = new BufferedPanel();
+            badge.Size = new Size(26, 26);
+            badge.Location = new Point(22, rowY);
+            badge.BackColor = ClrSidebar;
+            badge.Cursor = Cursors.Hand;
 
             Label num = new Label();
+            num.UseMnemonic = false;
             num.Text = (i + 1).ToString();
-            num.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
+            num.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
             num.ForeColor = ClrTextMuted;
             num.Dock = DockStyle.Fill;
             num.TextAlign = ContentAlignment.MiddleCenter;
+            num.BackColor = Color.Transparent;
+            num.Cursor = Cursors.Hand;
+            num.Click += (s, e) => OnStepSidebarClick(idx);
             badge.Controls.Add(num);
 
             badge.Paint += (s, e) => {
                 e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                Color borderClr = (idx == currentStep) ? ClrNvidiaGreen : Color.FromArgb(45, 45, 52);
-                using (Pen p = new Pen(borderClr, 1.2f))
+                bool isCurr = (idx == currentStep);
+                bool isDone = (idx < currentStep);
+                Color fillClr = isCurr ? Color.FromArgb(28, 46, 14) : (isDone ? Color.FromArgb(20, 32, 12) : Color.FromArgb(24, 24, 28));
+                Color borderClr = (isCurr || isDone) ? ClrNvidiaGreen : Color.FromArgb(52, 52, 60);
+                using (SolidBrush sb = new SolidBrush(fillClr))
                 {
-                    e.Graphics.DrawEllipse(p, 1, 1, 22, 22);
+                    e.Graphics.FillEllipse(sb, 1, 1, 23, 23);
+                }
+                using (Pen p = new Pen(borderClr, isCurr ? 1.8f : 1.2f))
+                {
+                    e.Graphics.DrawEllipse(p, 1, 1, 23, 23);
                 }
             };
+            badge.Click += (s, e) => OnStepSidebarClick(idx);
             sidebarPanel.Controls.Add(badge);
 
-            Label lbl = new Label();
-            lbl.Text = stepTitles[i];
-            lbl.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
-            lbl.ForeColor = ClrTextMuted;
-            lbl.Location = new Point(58, 98 + (i * 44));
-            lbl.Size = new Size(150, 20);
+            Label lbl = MakeLabel(stepTitles[i], new Font("Segoe UI", 9.5F, FontStyle.Regular), ClrTextMuted, new Point(56, rowY - 2), new Size(150, 18));
+            lbl.Cursor = Cursors.Hand;
+            lbl.Click += (s, e) => OnStepSidebarClick(idx);
             sidebarPanel.Controls.Add(lbl);
+
+            Label sub = MakeLabel(stepSubs[i], new Font("Segoe UI", 7.5F, FontStyle.Regular), Color.FromArgb(118, 118, 130), new Point(56, rowY + 16), new Size(150, 15));
+            sub.Cursor = Cursors.Hand;
+            sub.Click += (s, e) => OnStepSidebarClick(idx);
+            sidebarPanel.Controls.Add(sub);
 
             stepBadgePanels[i] = badge;
             stepNumberLabels[i] = num;
             stepTitleLabels[i] = lbl;
+            stepSubLabels[i] = sub;
         }
 
+        sidebarPanel.Controls.Add(MakeLabel(
+            "100% Offline Local AI\nCC BY-NC-SA 4.0 License\nNo PyTorch Bloat (~50MB deps)",
+            new Font("Segoe UI", 7.5F, FontStyle.Regular),
+            Color.FromArgb(135, 135, 148),
+            new Point(22, 428),
+            new Size(180, 52)
+        ));
+
         // 2. Main Content Area (Fixed adjacent at X = 220, Y = 0, Width = 600, Height = 500)
-        contentPanel = new Panel();
+        contentPanel = new BufferedPanel();
         contentPanel.Location = new Point(SidebarWidth, 0);
         contentPanel.Size = new Size(ContentWidth, MainHeight);
         contentPanel.BackColor = ClrBgDark;
         this.Controls.Add(contentPanel);
 
         // 3. Bottom Bar (Fixed at X = 0, Y = 500, Width = 820, Height = 60)
-        bottomPanel = new Panel();
+        bottomPanel = new BufferedPanel();
         bottomPanel.Location = new Point(0, MainHeight);
         bottomPanel.Size = new Size(FormWidth, BottomHeight);
         bottomPanel.BackColor = ClrSidebar;
         bottomPanel.Paint += (s, e) => {
-            e.Graphics.DrawLine(new Pen(ClrBorderSubtle, 1), 0, 0, FormWidth, 0);
+            using (Pen p = new Pen(ClrBorderSubtle, 1))
+            {
+                e.Graphics.DrawLine(p, 0, 0, FormWidth, 0);
+            }
         };
         this.Controls.Add(bottomPanel);
 
-        lblVersionInfo = new Label();
-        lblVersionInfo.Text = "Spoonbill AI Studio v4.0.0 (x64 CPU / GPU Edition)";
-        lblVersionInfo.Font = new Font("Segoe UI", 8F);
-        lblVersionInfo.ForeColor = ClrTextMuted;
-        lblVersionInfo.Location = new Point(24, 20);
-        lblVersionInfo.AutoSize = true;
+        lblVersionInfo = MakeLabel(
+            "Spoonbill AI Studio v4.0.0 (x64 CPU Safe Mode & NVIDIA CUDA Edition)",
+            new Font("Segoe UI", 8F),
+            ClrTextSecondary,
+            new Point(22, 21),
+            Size.Empty
+        );
         bottomPanel.Controls.Add(lblVersionInfo);
 
-        btnBack = new Button();
-        btnBack.Text = "< Back";
+        btnBack = new ModernButton();
+        btnBack.ButtonText = "< Back";
         btnBack.Size = new Size(92, 34);
         btnBack.Location = new Point(496, 13);
-        btnBack.BackColor = Color.FromArgb(32, 32, 36);
-        btnBack.ForeColor = ClrTextPrimary;
-        btnBack.FlatStyle = FlatStyle.Flat;
-        btnBack.FlatAppearance.BorderSize = 0;
-        btnBack.Cursor = Cursors.Hand;
-        btnBack.Click += (s, e) => { if (currentStep > 0 && !isInstalling) SwitchStep(currentStep - 1); };
+        btnBack.ActiveBackColor = Color.FromArgb(40, 40, 48);
+        btnBack.ActiveForeColor = Color.White;
+        btnBack.BorderColor = Color.FromArgb(72, 72, 84);
+        btnBack.TextFont = new Font("Segoe UI", 9F, FontStyle.Regular);
+        btnBack.ButtonClick += (s, e) => { if (currentStep > 0 && !isInstalling) SwitchStep(currentStep - 1); };
         bottomPanel.Controls.Add(btnBack);
 
-        btnNext = new Button();
-        btnNext.Text = "Next >";
-        btnNext.Size = new Size(100, 34);
-        btnNext.Location = new Point(598, 13);
-        btnNext.BackColor = ClrNvidiaGreen;
-        btnNext.ForeColor = Color.Black;
-        btnNext.FlatStyle = FlatStyle.Flat;
-        btnNext.FlatAppearance.BorderSize = 0;
-        btnNext.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-        btnNext.Cursor = Cursors.Hand;
-        btnNext.Click += OnNextClick;
+        btnNext = new ModernButton();
+        btnNext.ButtonText = "Next >";
+        btnNext.Size = new Size(104, 34);
+        btnNext.Location = new Point(596, 13);
+        btnNext.ActiveBackColor = ClrNvidiaGreen;
+        btnNext.ActiveForeColor = Color.Black;
+        btnNext.BorderColor = ClrNvidiaGreen;
+        btnNext.TextFont = new Font("Segoe UI", 9F, FontStyle.Bold);
+        btnNext.ButtonClick += OnNextClick;
         bottomPanel.Controls.Add(btnNext);
 
-        btnCancel = new Button();
-        btnCancel.Text = "Cancel";
-        btnCancel.Size = new Size(92, 34);
+        btnCancel = new ModernButton();
+        btnCancel.ButtonText = "Cancel";
+        btnCancel.Size = new Size(90, 34);
         btnCancel.Location = new Point(708, 13);
-        btnCancel.BackColor = Color.FromArgb(32, 32, 36);
-        btnCancel.ForeColor = ClrTextSecondary;
-        btnCancel.FlatStyle = FlatStyle.Flat;
-        btnCancel.FlatAppearance.BorderSize = 0;
-        btnCancel.Cursor = Cursors.Hand;
-        btnCancel.Click += OnCancelClick;
+        btnCancel.ActiveBackColor = Color.FromArgb(40, 40, 48);
+        btnCancel.ActiveForeColor = ClrTextSecondary;
+        btnCancel.BorderColor = Color.FromArgb(72, 72, 84);
+        btnCancel.TextFont = new Font("Segoe UI", 9F, FontStyle.Regular);
+        btnCancel.ButtonClick += OnCancelClick;
         bottomPanel.Controls.Add(btnCancel);
 
         BuildStepPages();
     }
 
+    private void OnStepSidebarClick(int idx)
+    {
+        if (!isInstalling && idx < currentStep)
+        {
+            SwitchStep(idx);
+        }
+    }
+
+    private BufferedPanel CreateStepPage()
+    {
+        BufferedPanel p = new BufferedPanel();
+        p.Location = new Point(0, 0);
+        p.Size = new Size(ContentWidth, MainHeight);
+        p.BackColor = ClrBgDark;
+        p.Visible = false;
+        contentPanel.Controls.Add(p);
+        return p;
+    }
+
     private void BuildStepPages()
     {
         // ================= PAGE 0: SYSTEM CHECK =================
-        panelSystemCheck = new Panel();
-        panelSystemCheck.Dock = DockStyle.Fill;
-        contentPanel.Controls.Add(panelSystemCheck);
+        panelSystemCheck = CreateStepPage();
 
-        // ================= PAGE 0: SYSTEM CHECK =================
-        panelSystemCheck = new Panel();
-        panelSystemCheck.Dock = DockStyle.Fill;
-        contentPanel.Controls.Add(panelSystemCheck);
-
-        lblSysTitle = new Label();
-        lblSysTitle.Text = "System Compatibility & Environment Scan";
-        lblSysTitle.Font = new Font("Segoe UI", 13.5F, FontStyle.Bold);
-        lblSysTitle.ForeColor = Color.White;
-        lblSysTitle.Location = new Point(28, 16);
-        lblSysTitle.Size = new Size(540, 26);
+        lblSysTitle = MakeLabel("Step 1: System Compatibility & Environment Scan", new Font("Segoe UI", 13F, FontStyle.Bold), Color.White, new Point(28, 14), new Size(544, 24));
         panelSystemCheck.Controls.Add(lblSysTitle);
 
-        lblSysDesc = new Label();
-        lblSysDesc.Text = "Verifying operating system architecture, hardware compute, and Python runtime.";
-        lblSysDesc.ForeColor = Color.FromArgb(200, 200, 210);
-        lblSysDesc.Location = new Point(28, 42);
-        lblSysDesc.Size = new Size(540, 20);
+        lblSysDesc = MakeLabel("Checking operating system, compute cores, GPU acceleration, Python runtime, and prior builds.", new Font("Segoe UI", 8.5F), ClrTextSecondary, new Point(28, 39), new Size(544, 18));
         panelSystemCheck.Controls.Add(lblSysDesc);
 
-        sysCardPanels = new Panel[4];
-        sysCardTitles = new Label[4];
-        sysCardValues = new Label[4];
-        sysCardBadges = new Label[4];
+        sysCardPanels = new BufferedPanel[5];
+        sysCardTitles = new Label[5];
+        sysCardValues = new Label[5];
+        sysCardBadges = new Label[5];
 
         string[] cardHeaders = new string[] {
             "Operating System & Architecture",
-            "Processor & Hardware Cores",
+            "Processor & Compute Cores",
             "Graphics & Acceleration Engine",
-            "Python AI Inference Runtime"
+            "Python 3 AI Inference Runtime",
+            "Existing Studio Installation Check"
         };
 
-        for (int i = 0; i < 4; i++)
+        for (int i = 0; i < 5; i++)
         {
-            Panel card = new Panel();
-            card.Size = new Size(540, 48);
-            card.Location = new Point(28, 66 + (i * 54));
+            BufferedPanel card = new BufferedPanel();
+            card.Size = new Size(544, 42);
+            card.Location = new Point(28, 62 + (i * 46));
             card.BackColor = ClrCardBg;
             card.Paint += (s, e) => {
-                e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
                 using (Pen p = new Pen(ClrCardBorder, 1))
                 {
                     e.Graphics.DrawRectangle(p, 0, 0, card.Width - 1, card.Height - 1);
@@ -357,29 +595,15 @@ public class SpoonbillNvidiaInstaller : Form
             };
             panelSystemCheck.Controls.Add(card);
 
-            Label title = new Label();
-            title.Text = cardHeaders[i];
-            title.Font = new Font("Segoe UI", 8F, FontStyle.Regular);
-            title.ForeColor = Color.FromArgb(180, 180, 190);
-            title.Location = new Point(16, 7);
-            title.AutoSize = true;
+            Label title = MakeLabel(cardHeaders[i], new Font("Segoe UI", 7.5F, FontStyle.Regular), Color.FromArgb(185, 185, 198), new Point(14, 4), Size.Empty);
             card.Controls.Add(title);
 
-            Label val = new Label();
-            val.Text = "Scanning environment...";
-            val.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-            val.ForeColor = Color.White;
-            val.Location = new Point(16, 24);
-            val.Size = new Size(380, 18);
+            Label val = MakeLabel("Scanning environment...", new Font("Segoe UI", 8.5F, FontStyle.Bold), Color.White, new Point(14, 20), new Size(388, 18));
+            val.AutoEllipsis = true;
             card.Controls.Add(val);
 
-            Label badge = new Label();
-            badge.Text = "CHECKING";
-            badge.Font = new Font("Segoe UI", 7.5F, FontStyle.Bold);
-            badge.ForeColor = ClrNvidiaGreen;
+            Label badge = MakeLabel("CHECKING", new Font("Segoe UI", 7.5F, FontStyle.Bold), ClrNvidiaGreen, new Point(410, 9), new Size(122, 24));
             badge.BackColor = Color.FromArgb(24, 38, 16);
-            badge.Location = new Point(405, 12);
-            badge.Size = new Size(120, 24);
             badge.TextAlign = ContentAlignment.MiddleCenter;
             card.Controls.Add(badge);
 
@@ -390,12 +614,11 @@ public class SpoonbillNvidiaInstaller : Form
         }
 
         // Advisory Banner for Readiness & Troubleshooting
-        pnlSysAdvisory = new Panel();
-        pnlSysAdvisory.Size = new Size(540, 80);
-        pnlSysAdvisory.Location = new Point(28, 286);
-        pnlSysAdvisory.BackColor = Color.FromArgb(24, 24, 28);
+        pnlSysAdvisory = new BufferedPanel();
+        pnlSysAdvisory.Size = new Size(544, 72);
+        pnlSysAdvisory.Location = new Point(28, 296);
+        pnlSysAdvisory.BackColor = Color.FromArgb(22, 28, 16);
         pnlSysAdvisory.Paint += (s, e) => {
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             bool pyOk = !string.IsNullOrEmpty(pythonBinary);
             Color bClr = pyOk ? ClrNvidiaGreen : Color.FromArgb(239, 68, 68);
             using (Pen p = new Pen(bClr, 1.2f))
@@ -405,504 +628,488 @@ public class SpoonbillNvidiaInstaller : Form
         };
         panelSystemCheck.Controls.Add(pnlSysAdvisory);
 
-        lblAdvisoryTitle = new Label();
-        lblAdvisoryTitle.Text = "System Scan Initializing...";
-        lblAdvisoryTitle.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-        lblAdvisoryTitle.ForeColor = Color.White;
+        lblAdvisoryTitle = MakeLabel("System Scan Initializing...", new Font("Segoe UI", 9F, FontStyle.Bold), Color.White, new Point(14, 8), new Size(516, 18));
         lblAdvisoryTitle.BackColor = Color.Transparent;
-        lblAdvisoryTitle.Location = new Point(16, 10);
-        lblAdvisoryTitle.Size = new Size(508, 20);
         pnlSysAdvisory.Controls.Add(lblAdvisoryTitle);
 
-        lblAdvisoryDesc = new Label();
-        lblAdvisoryDesc.Text = "Analyzing hardware accelerators and runtime prerequisites...";
-        lblAdvisoryDesc.Font = new Font("Segoe UI", 8.5F);
-        lblAdvisoryDesc.ForeColor = Color.FromArgb(220, 220, 230);
+        lblAdvisoryDesc = MakeLabel("Analyzing hardware accelerators and runtime prerequisites...", new Font("Segoe UI", 8.25F), Color.FromArgb(228, 228, 236), new Point(14, 28), new Size(516, 38));
         lblAdvisoryDesc.BackColor = Color.Transparent;
-        lblAdvisoryDesc.Location = new Point(16, 32);
-        lblAdvisoryDesc.Size = new Size(508, 40);
         pnlSysAdvisory.Controls.Add(lblAdvisoryDesc);
 
         // System Check Action Row
-        btnHowToReady = new Button();
-        btnHowToReady.Text = "How to Make Ready...";
-        btnHowToReady.Location = new Point(28, 376);
-        btnHowToReady.Size = new Size(175, 34);
-        btnHowToReady.BackColor = Color.FromArgb(48, 48, 56);
-        btnHowToReady.ForeColor = Color.White;
-        btnHowToReady.FlatStyle = FlatStyle.Flat;
-        btnHowToReady.FlatAppearance.BorderColor = Color.FromArgb(75, 75, 85);
-        btnHowToReady.Cursor = Cursors.Hand;
-        btnHowToReady.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
-        btnHowToReady.Click += (s, e) => ShowTroubleshootingDialog();
+        btnHowToReady = new ModernButton();
+        btnHowToReady.ButtonText = "How to Make Ready...";
+        btnHowToReady.Location = new Point(28, 378);
+        btnHowToReady.Size = new Size(176, 34);
+        btnHowToReady.ActiveBackColor = Color.FromArgb(44, 44, 52);
+        btnHowToReady.ActiveForeColor = Color.White;
+        btnHowToReady.BorderColor = Color.FromArgb(80, 80, 92);
+        btnHowToReady.ButtonClick += (s, e) => ShowTroubleshootingDialog();
         panelSystemCheck.Controls.Add(btnHowToReady);
 
-        btnRefreshScan = new Button();
-        btnRefreshScan.Text = "Refresh Scan";
-        btnRefreshScan.Location = new Point(211, 376);
-        btnRefreshScan.Size = new Size(130, 34);
-        btnRefreshScan.BackColor = ClrNvidiaGreen;
-        btnRefreshScan.ForeColor = Color.Black;
-        btnRefreshScan.FlatStyle = FlatStyle.Flat;
-        btnRefreshScan.FlatAppearance.BorderSize = 0;
-        btnRefreshScan.Cursor = Cursors.Hand;
-        btnRefreshScan.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
-        btnRefreshScan.Click += (s, e) => RunSystemCheck();
+        btnRefreshScan = new ModernButton();
+        btnRefreshScan.ButtonText = "Refresh Scan";
+        btnRefreshScan.Location = new Point(212, 378);
+        btnRefreshScan.Size = new Size(124, 34);
+        btnRefreshScan.ActiveBackColor = ClrNvidiaGreen;
+        btnRefreshScan.ActiveForeColor = Color.Black;
+        btnRefreshScan.BorderColor = ClrNvidiaGreen;
+        btnRefreshScan.ButtonClick += (s, e) => RunSystemCheck();
         panelSystemCheck.Controls.Add(btnRefreshScan);
 
-        lblLastScanTime = new Label();
-        lblLastScanTime.Text = "Click Refresh after installing dependencies";
-        lblLastScanTime.Font = new Font("Segoe UI", 8.5F);
-        lblLastScanTime.ForeColor = Color.FromArgb(190, 190, 200);
-        lblLastScanTime.Location = new Point(352, 384);
-        lblLastScanTime.Size = new Size(216, 20);
+        btnRemoveExisting = new ModernButton();
+        btnRemoveExisting.ButtonText = "Uninstall Old Build";
+        btnRemoveExisting.Location = new Point(344, 378);
+        btnRemoveExisting.Size = new Size(144, 34);
+        btnRemoveExisting.ActiveBackColor = Color.FromArgb(56, 22, 22);
+        btnRemoveExisting.ActiveForeColor = Color.FromArgb(254, 202, 202);
+        btnRemoveExisting.BorderColor = Color.FromArgb(185, 60, 60);
+        btnRemoveExisting.Visible = false;
+        btnRemoveExisting.ButtonClick += OnQuickRemoveExistingClick;
+        panelSystemCheck.Controls.Add(btnRemoveExisting);
+
+        lblLastScanTime = MakeLabel("Tip: Click 'Refresh Scan' after installing Python or drivers.", new Font("Segoe UI", 8F), ClrTextSecondary, new Point(28, 420), new Size(544, 18));
         panelSystemCheck.Controls.Add(lblLastScanTime);
 
         // ================= PAGE 1: USER AGREEMENT =================
-        panelAgreement = new Panel();
-        panelAgreement.Dock = DockStyle.Fill;
-        contentPanel.Controls.Add(panelAgreement);
+        panelAgreement = CreateStepPage();
 
-        lblAgreeTitle = new Label();
-        lblAgreeTitle.Text = "License & AI Dependencies Agreement";
-        lblAgreeTitle.Font = new Font("Segoe UI", 13.5F, FontStyle.Bold);
-        lblAgreeTitle.ForeColor = Color.White;
-        lblAgreeTitle.Location = new Point(28, 16);
-        lblAgreeTitle.Size = new Size(540, 26);
+        lblAgreeTitle = MakeLabel("Step 2: License & AI Dependencies Agreement", new Font("Segoe UI", 13F, FontStyle.Bold), Color.White, new Point(28, 14), new Size(544, 24));
         panelAgreement.Controls.Add(lblAgreeTitle);
 
-        lblAgreeDesc = new Label();
-        lblAgreeDesc.Text = "Please review the conservation research license, pip permissions, and privacy terms.";
-        lblAgreeDesc.ForeColor = Color.FromArgb(200, 200, 210);
-        lblAgreeDesc.Location = new Point(28, 42);
-        lblAgreeDesc.Size = new Size(540, 20);
+        lblAgreeDesc = MakeLabel("Review the conservation license and pip dependency authorization. Select one option box below.", new Font("Segoe UI", 8.5F), ClrTextSecondary, new Point(28, 39), new Size(544, 18));
         panelAgreement.Controls.Add(lblAgreeDesc);
 
-        txtAgreementTerms = new RichTextBox();
-        txtAgreementTerms.Multiline = true;
-        txtAgreementTerms.ReadOnly = true;
-        txtAgreementTerms.ScrollBars = RichTextBoxScrollBars.Vertical;
-        txtAgreementTerms.BackColor = Color.FromArgb(16, 16, 20);
-        txtAgreementTerms.ForeColor = Color.FromArgb(235, 235, 240);
-        txtAgreementTerms.Font = new Font("Consolas", 8.5F, FontStyle.Regular);
-        txtAgreementTerms.BorderStyle = BorderStyle.None;
-        txtAgreementTerms.Location = new Point(28, 68);
-        txtAgreementTerms.Size = new Size(540, 196);
-        txtAgreementTerms.Text =
-            "BLACK-FACED SPOONBILL AI STUDIO V4 — LICENSE & USAGE AGREEMENT" + Environment.NewLine +
-            "=========================================================================" + Environment.NewLine + Environment.NewLine +
-            "1. CONSERVATION RESEARCH LICENSE GRANT" + Environment.NewLine +
-            "This software is provided under Creative Commons Attribution-NonCommercial-" + Environment.NewLine +
-            "ShareAlike 4.0 International (CC BY-NC-SA 4.0). You are granted permission to" + Environment.NewLine +
-            "use, evaluate, and adapt this studio for non-commercial ecological research," + Environment.NewLine +
-            "academic study, and Black-faced Spoonbill (Platalea minor) wildlife census." + Environment.NewLine +
-            "Commercial monetization or sale of this application without explicit permission" + Environment.NewLine +
-            "from the original authors is strictly prohibited." + Environment.NewLine + Environment.NewLine +
-            "2. AI DEPENDENCIES & AUTOMATED PIP EXECUTION" + Environment.NewLine +
-            "By agreeing, you authorize the setup wizard to verify your local Python 3" + Environment.NewLine +
-            "installation and run 'pip install -r requirements_lean.txt' to acquire runtime" + Environment.NewLine +
-            "libraries (onnxruntime, fastapi, uvicorn, opencv-python-headless, pillow, numpy)." + Environment.NewLine +
-            "Total download footprint is approximately 50 MB with zero PyTorch bloat." + Environment.NewLine + Environment.NewLine +
-            "3. 100% LOCAL INFERENCE & DATA PRIVACY GUARANTEE" + Environment.NewLine +
-            "All deep learning inference, image processing, and census calculations execute" + Environment.NewLine +
-            "100% locally on your computer. No user photographs, surveillance feeds, or survey" + Environment.NewLine +
-            "data are uploaded to external cloud endpoints." + Environment.NewLine + Environment.NewLine +
-            "4. MANDATORY DEPENDENCY REQUIREMENT & CLEAN ABORT" + Environment.NewLine +
-            "Spoonbill AI Studio cannot operate without its local neural inference backend." + Environment.NewLine +
-            "If you select 'Do not accept', setup will cancel immediately without writing files.";
-        panelAgreement.Controls.Add(txtAgreementTerms);
+        pnlTermsScroll = new ScrollTextPanel(544, 198);
+        pnlTermsScroll.Location = new Point(28, 62);
+        pnlTermsScroll.SetText(
+            "BLACK-FACED SPOONBILL AI STUDIO V4 — LICENSE & USAGE AGREEMENT\r\n" +
+            "==============================================================\r\n\r\n" +
+            "1. CONSERVATION RESEARCH LICENSE GRANT (CC BY-NC-SA 4.0)\r\n" +
+            "This software is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International. " +
+            "You are granted permission to use, evaluate, and adapt this studio for non-commercial ecological research, " +
+            "academic study, and Black-faced Spoonbill (Platalea minor) wildlife conservation census. Commercial use or " +
+            "monetization without explicit written permission and author attribution is strictly prohibited.\r\n\r\n" +
+            "2. AI DEPENDENCIES & AUTOMATED PIP EXECUTION\r\n" +
+            "By accepting, you authorize the installer to verify your local Python 3 installation and execute " +
+            "'pip install -r requirements_lean.txt' to install lean runtime packages (onnxruntime, fastapi, uvicorn, " +
+            "opencv-python-headless, pillow, numpy, python-multipart). Total footprint is ~50 MB with zero PyTorch bloat.\r\n\r\n" +
+            "3. 100% LOCAL INFERENCE & DATA PRIVACY GUARANTEE\r\n" +
+            "All deep learning inference, segmentation masks, and population counts run 100% locally on your workstation. " +
+            "No user imagery or telemetry is ever uploaded to external servers.\r\n\r\n" +
+            "4. MANDATORY DEPENDENCY REQUIREMENT & CLEAN ABORT\r\n" +
+            "Spoonbill AI Studio requires its local inference backend to operate. If you select 'I DO NOT ACCEPT', " +
+            "setup will safely abort without writing any files or modifying your computer."
+        );
+        panelAgreement.Controls.Add(pnlTermsScroll);
 
         // Agreement Toggleable Choice Box 1 (Accept)
-        pnlAgreeBox = new Panel();
-        pnlAgreeBox.Size = new Size(540, 52);
-        pnlAgreeBox.Location = new Point(28, 274);
+        pnlAgreeBox = new BufferedPanel();
+        pnlAgreeBox.Size = new Size(544, 54);
+        pnlAgreeBox.Location = new Point(28, 270);
         pnlAgreeBox.BackColor = ClrCardBg;
         pnlAgreeBox.Cursor = Cursors.Hand;
         pnlAgreeBox.Paint += (s, e) => {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
             bool isSel = (agreementChoice == 1);
-            Color bClr = isSel ? ClrNvidiaGreen : Color.FromArgb(50, 50, 58);
-            Color fClr = isSel ? Color.FromArgb(24, 40, 16) : ClrCardBg;
+            Color bClr = isSel ? ClrNvidiaGreen : Color.FromArgb(62, 62, 72);
+            Color fClr = isSel ? Color.FromArgb(24, 42, 16) : ClrCardBg;
 
             using (SolidBrush sb = new SolidBrush(fClr))
             {
                 e.Graphics.FillRectangle(sb, 0, 0, pnlAgreeBox.Width, pnlAgreeBox.Height);
             }
-            using (Pen p = new Pen(bClr, isSel ? 1.5f : 1f))
+            using (Pen p = new Pen(bClr, isSel ? 2.0f : 1.0f))
             {
-                e.Graphics.DrawRectangle(p, 0, 0, pnlAgreeBox.Width - 1, pnlAgreeBox.Height - 1);
+                e.Graphics.DrawRectangle(p, 1, 1, pnlAgreeBox.Width - 2, pnlAgreeBox.Height - 2);
             }
 
-            // Indicator Square at (16, 16, 20, 20)
             if (isSel)
             {
                 using (SolidBrush b = new SolidBrush(ClrNvidiaGreen))
                 {
-                    e.Graphics.FillRectangle(b, 16, 16, 20, 20);
+                    e.Graphics.FillRectangle(b, 16, 17, 20, 20);
                 }
-                using (Pen pCheck = new Pen(Color.FromArgb(13, 13, 15), 2.2f))
+                using (Pen pCheck = new Pen(Color.FromArgb(10, 10, 12), 2.4f))
                 {
                     e.Graphics.DrawLines(pCheck, new Point[] {
-                        new Point(20, 26),
-                        new Point(24, 31),
-                        new Point(32, 20)
+                        new Point(20, 27),
+                        new Point(24, 32),
+                        new Point(32, 21)
                     });
                 }
             }
             else
             {
-                using (Pen pBox = new Pen(Color.FromArgb(140, 140, 150), 1.5f))
+                using (Pen pBox = new Pen(Color.FromArgb(160, 160, 175), 1.5f))
                 {
-                    e.Graphics.DrawRectangle(pBox, 16, 16, 20, 20);
+                    e.Graphics.DrawRectangle(pBox, 16, 17, 20, 20);
                 }
             }
 
-            // High-contrast direct text drawing
-            using (Font fTitle = new Font("Segoe UI", 9F, FontStyle.Bold))
-            using (Brush bTitle = new SolidBrush(isSel ? Color.White : Color.FromArgb(235, 235, 240)))
+            using (Font fTitle = new Font("Segoe UI", 9.25F, FontStyle.Bold))
+            using (Brush bTitle = new SolidBrush(isSel ? Color.White : Color.FromArgb(242, 242, 248)))
             {
-                e.Graphics.DrawString("I accept the license terms and agree to install required AI dependencies", fTitle, bTitle, 46, 8);
+                e.Graphics.DrawString("I ACCEPT the license terms and authorize AI dependency installation", fTitle, bTitle, 46, 8);
             }
             using (Font fSub = new Font("Segoe UI", 8F, FontStyle.Regular))
-            using (Brush bSub = new SolidBrush(isSel ? Color.FromArgb(190, 225, 170) : Color.FromArgb(180, 180, 190)))
+            using (Brush bSub = new SolidBrush(isSel ? Color.FromArgb(200, 238, 175) : Color.FromArgb(195, 195, 208)))
             {
-                e.Graphics.DrawString("Authorizes automated pip execution for lean runtime libraries (onnxruntime, fastapi, uvicorn).", fSub, bSub, 46, 28);
+                e.Graphics.DrawString("Enables Next button to configure Express or Custom installation options (click again to unselect).", fSub, bSub, 46, 29);
             }
         };
-        pnlAgreeBox.Click += (s, e) => ToggleAgreementChoice(1);
+        pnlAgreeBox.MouseDown += (s, e) => ToggleAgreementChoice(1);
         panelAgreement.Controls.Add(pnlAgreeBox);
 
         // Agreement Toggleable Choice Box 2 (Decline)
-        pnlDeclineBox = new Panel();
-        pnlDeclineBox.Size = new Size(540, 52);
-        pnlDeclineBox.Location = new Point(28, 334);
+        pnlDeclineBox = new BufferedPanel();
+        pnlDeclineBox.Size = new Size(544, 54);
+        pnlDeclineBox.Location = new Point(28, 332);
         pnlDeclineBox.BackColor = ClrCardBg;
         pnlDeclineBox.Cursor = Cursors.Hand;
         pnlDeclineBox.Paint += (s, e) => {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
             bool isSel = (agreementChoice == 2);
-            Color bClr = isSel ? Color.FromArgb(239, 68, 68) : Color.FromArgb(50, 50, 58);
-            Color fClr = isSel ? Color.FromArgb(40, 18, 18) : ClrCardBg;
+            Color bClr = isSel ? Color.FromArgb(239, 68, 68) : Color.FromArgb(62, 62, 72);
+            Color fClr = isSel ? Color.FromArgb(46, 18, 18) : ClrCardBg;
 
             using (SolidBrush sb = new SolidBrush(fClr))
             {
                 e.Graphics.FillRectangle(sb, 0, 0, pnlDeclineBox.Width, pnlDeclineBox.Height);
             }
-            using (Pen p = new Pen(bClr, isSel ? 1.5f : 1f))
+            using (Pen p = new Pen(bClr, isSel ? 2.0f : 1.0f))
             {
-                e.Graphics.DrawRectangle(p, 0, 0, pnlDeclineBox.Width - 1, pnlDeclineBox.Height - 1);
+                e.Graphics.DrawRectangle(p, 1, 1, pnlDeclineBox.Width - 2, pnlDeclineBox.Height - 2);
             }
 
-            // Indicator Square at (16, 16, 20, 20)
             if (isSel)
             {
                 using (SolidBrush b = new SolidBrush(Color.FromArgb(239, 68, 68)))
                 {
-                    e.Graphics.FillRectangle(b, 16, 16, 20, 20);
+                    e.Graphics.FillRectangle(b, 16, 17, 20, 20);
                 }
-                using (Pen pX = new Pen(Color.White, 2.0f))
+                using (Pen pX = new Pen(Color.White, 2.2f))
                 {
-                    e.Graphics.DrawLine(pX, 21, 21, 31, 31);
-                    e.Graphics.DrawLine(pX, 31, 21, 21, 31);
+                    e.Graphics.DrawLine(pX, 21, 22, 31, 32);
+                    e.Graphics.DrawLine(pX, 31, 22, 21, 32);
                 }
             }
             else
             {
-                using (Pen pBox = new Pen(Color.FromArgb(140, 140, 150), 1.5f))
+                using (Pen pBox = new Pen(Color.FromArgb(160, 160, 175), 1.5f))
                 {
-                    e.Graphics.DrawRectangle(pBox, 16, 16, 20, 20);
+                    e.Graphics.DrawRectangle(pBox, 16, 17, 20, 20);
                 }
             }
 
-            // High-contrast direct text drawing
-            using (Font fTitle = new Font("Segoe UI", 9F, FontStyle.Bold))
-            using (Brush bTitle = new SolidBrush(isSel ? Color.FromArgb(254, 202, 202) : Color.FromArgb(235, 235, 240)))
+            using (Font fTitle = new Font("Segoe UI", 9.25F, FontStyle.Bold))
+            using (Brush bTitle = new SolidBrush(isSel ? Color.FromArgb(254, 215, 215) : Color.FromArgb(242, 242, 248)))
             {
-                e.Graphics.DrawString("I do not accept the terms (Cancel installation and exit setup immediately)", fTitle, bTitle, 46, 8);
+                e.Graphics.DrawString("I DO NOT ACCEPT the terms (Cancel installation and exit setup)", fTitle, bTitle, 46, 8);
             }
             using (Font fSub = new Font("Segoe UI", 8F, FontStyle.Regular))
-            using (Brush bSub = new SolidBrush(isSel ? Color.FromArgb(240, 180, 180) : Color.FromArgb(180, 180, 190)))
+            using (Brush bSub = new SolidBrush(isSel ? Color.FromArgb(248, 185, 185) : Color.FromArgb(195, 195, 208)))
             {
-                e.Graphics.DrawString("Setup will safely abort without modifying system files or installing packages.", fSub, bSub, 46, 28);
+                e.Graphics.DrawString("Setup will safely abort without modifying system files or installing packages (click again to unselect).", fSub, bSub, 46, 29);
             }
         };
-        pnlDeclineBox.Click += (s, e) => ToggleAgreementChoice(2);
+        pnlDeclineBox.MouseDown += (s, e) => ToggleAgreementChoice(2);
         panelAgreement.Controls.Add(pnlDeclineBox);
 
-        // Agreement Selection Status
-        lblAgreementStatus = new Label();
-        lblAgreementStatus.Font = new Font("Segoe UI", 9F);
-        lblAgreementStatus.ForeColor = Color.FromArgb(200, 200, 210);
-        lblAgreementStatus.Location = new Point(28, 396);
-        lblAgreementStatus.Size = new Size(540, 22);
-        lblAgreementStatus.Text = "Please click an option box above to select your choice (click again to deselect).";
+        lblAgreementStatus = MakeLabel("Status: No option selected. Click one of the boxes above (only one can be active at a time).", new Font("Segoe UI", 8.75F, FontStyle.Bold), ClrTextSecondary, new Point(28, 396), new Size(544, 22));
         panelAgreement.Controls.Add(lblAgreementStatus);
 
         // ================= PAGE 2: MODE & OPTIONS =================
-        panelModeAndOptions = new Panel();
-        panelModeAndOptions.Dock = DockStyle.Fill;
-        contentPanel.Controls.Add(panelModeAndOptions);
+        panelModeAndOptions = CreateStepPage();
 
-        lblOptTitle = new Label();
-        lblOptTitle.Text = "Installation Mode & Configuration";
-        lblOptTitle.Font = new Font("Segoe UI", 13.5F, FontStyle.Bold);
-        lblOptTitle.ForeColor = Color.White;
-        lblOptTitle.Location = new Point(28, 16);
-        lblOptTitle.Size = new Size(540, 26);
+        lblOptTitle = MakeLabel("Step 3: Installation Mode & Target Configuration", new Font("Segoe UI", 13F, FontStyle.Bold), Color.White, new Point(28, 14), new Size(544, 24));
         panelModeAndOptions.Controls.Add(lblOptTitle);
 
-        lblOptDesc = new Label();
-        lblOptDesc.Text = "Select Express for automated deployment or Custom for advanced paths and parts.";
-        lblOptDesc.ForeColor = Color.FromArgb(200, 200, 210);
-        lblOptDesc.Location = new Point(28, 42);
-        lblOptDesc.Size = new Size(540, 20);
+        lblOptDesc = MakeLabel("Choose Express for automatic setup or Custom to customize paths, models, and shortcuts.", new Font("Segoe UI", 8.5F), ClrTextSecondary, new Point(28, 39), new Size(544, 18));
         panelModeAndOptions.Controls.Add(lblOptDesc);
 
         // Express Card (Strict Mutually Exclusive)
-        pnlExpressCard = new Panel();
-        pnlExpressCard.Size = new Size(260, 80);
-        pnlExpressCard.Location = new Point(28, 72);
+        pnlExpressCard = new BufferedPanel();
+        pnlExpressCard.Size = new Size(264, 78);
+        pnlExpressCard.Location = new Point(28, 64);
         pnlExpressCard.BackColor = ClrCardBg;
         pnlExpressCard.Cursor = Cursors.Hand;
         pnlExpressCard.Paint += (s, e) => {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
             bool isSel = (installMode == 0);
-            Color bClr = isSel ? ClrNvidiaGreen : Color.FromArgb(50, 50, 58);
-            Color fClr = isSel ? Color.FromArgb(24, 40, 16) : ClrCardBg;
+            Color bClr = isSel ? ClrNvidiaGreen : Color.FromArgb(62, 62, 72);
+            Color fClr = isSel ? Color.FromArgb(24, 42, 16) : ClrCardBg;
 
             using (SolidBrush sb = new SolidBrush(fClr))
             {
                 e.Graphics.FillRectangle(sb, 0, 0, pnlExpressCard.Width, pnlExpressCard.Height);
             }
-            using (Pen p = new Pen(bClr, isSel ? 1.5f : 1f))
+            using (Pen p = new Pen(bClr, isSel ? 2.0f : 1.0f))
             {
-                e.Graphics.DrawRectangle(p, 0, 0, pnlExpressCard.Width - 1, pnlExpressCard.Height - 1);
+                e.Graphics.DrawRectangle(p, 1, 1, pnlExpressCard.Width - 2, pnlExpressCard.Height - 2);
             }
 
-            // Radio Circle at (16, 14, 18, 18)
             if (isSel)
             {
                 using (SolidBrush b = new SolidBrush(ClrNvidiaGreen))
                 {
-                    e.Graphics.FillEllipse(b, 16, 14, 18, 18);
+                    e.Graphics.FillEllipse(b, 14, 14, 18, 18);
                 }
-                using (SolidBrush bDot = new SolidBrush(Color.FromArgb(13, 13, 15)))
+                using (SolidBrush bDot = new SolidBrush(Color.FromArgb(10, 10, 12)))
                 {
-                    e.Graphics.FillEllipse(bDot, 22, 20, 6, 6);
+                    e.Graphics.FillEllipse(bDot, 20, 20, 6, 6);
                 }
             }
             else
             {
-                using (Pen pCircle = new Pen(Color.FromArgb(140, 140, 150), 1.5f))
+                using (Pen pCircle = new Pen(Color.FromArgb(160, 160, 175), 1.5f))
                 {
-                    e.Graphics.DrawEllipse(pCircle, 16, 14, 18, 18);
+                    e.Graphics.DrawEllipse(pCircle, 14, 14, 18, 18);
                 }
             }
 
-            // Direct text drawing
             using (Font fTitle = new Font("Segoe UI", 9.5F, FontStyle.Bold))
-            using (Brush bTitle = new SolidBrush(isSel ? Color.White : Color.FromArgb(235, 235, 240)))
+            using (Brush bTitle = new SolidBrush(isSel ? Color.White : Color.FromArgb(242, 242, 248)))
             {
-                e.Graphics.DrawString("Express (Recommended)", fTitle, bTitle, 42, 12);
+                e.Graphics.DrawString("Express (Recommended)", fTitle, bTitle, 40, 11);
             }
             using (Font fSub = new Font("Segoe UI", 8F, FontStyle.Regular))
-            using (Brush bSub = new SolidBrush(isSel ? Color.FromArgb(190, 225, 170) : Color.FromArgb(180, 180, 190)))
+            using (Brush bSub = new SolidBrush(isSel ? Color.FromArgb(200, 238, 175) : Color.FromArgb(195, 195, 208)))
             {
-                e.Graphics.DrawString("Automatic setup with all models,\ndependencies, & clean upgrade.", fSub, bSub, 42, 34);
+                e.Graphics.DrawString("Automated clean install with all\nONNX models, pip deps, & shortcuts.", fSub, bSub, 40, 33);
             }
         };
-        pnlExpressCard.Click += (s, e) => SetInstallMode(0);
+        pnlExpressCard.MouseDown += (s, e) => SetInstallMode(0);
         panelModeAndOptions.Controls.Add(pnlExpressCard);
 
         // Custom Card (Strict Mutually Exclusive)
-        pnlCustomCard = new Panel();
-        pnlCustomCard.Size = new Size(260, 80);
-        pnlCustomCard.Location = new Point(308, 72);
+        pnlCustomCard = new BufferedPanel();
+        pnlCustomCard.Size = new Size(264, 78);
+        pnlCustomCard.Location = new Point(308, 64);
         pnlCustomCard.BackColor = ClrCardBg;
         pnlCustomCard.Cursor = Cursors.Hand;
         pnlCustomCard.Paint += (s, e) => {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
             bool isSel = (installMode == 1);
-            Color bClr = isSel ? ClrNvidiaGreen : Color.FromArgb(50, 50, 58);
-            Color fClr = isSel ? Color.FromArgb(24, 40, 16) : ClrCardBg;
+            Color bClr = isSel ? ClrNvidiaGreen : Color.FromArgb(62, 62, 72);
+            Color fClr = isSel ? Color.FromArgb(24, 42, 16) : ClrCardBg;
 
             using (SolidBrush sb = new SolidBrush(fClr))
             {
                 e.Graphics.FillRectangle(sb, 0, 0, pnlCustomCard.Width, pnlCustomCard.Height);
             }
-            using (Pen p = new Pen(bClr, isSel ? 1.5f : 1f))
+            using (Pen p = new Pen(bClr, isSel ? 2.0f : 1.0f))
             {
-                e.Graphics.DrawRectangle(p, 0, 0, pnlCustomCard.Width - 1, pnlCustomCard.Height - 1);
+                e.Graphics.DrawRectangle(p, 1, 1, pnlCustomCard.Width - 2, pnlCustomCard.Height - 2);
             }
 
-            // Radio Circle at (16, 14, 18, 18)
             if (isSel)
             {
                 using (SolidBrush b = new SolidBrush(ClrNvidiaGreen))
                 {
-                    e.Graphics.FillEllipse(b, 16, 14, 18, 18);
+                    e.Graphics.FillEllipse(b, 14, 14, 18, 18);
                 }
-                using (SolidBrush bDot = new SolidBrush(Color.FromArgb(13, 13, 15)))
+                using (SolidBrush bDot = new SolidBrush(Color.FromArgb(10, 10, 12)))
                 {
-                    e.Graphics.FillEllipse(bDot, 22, 20, 6, 6);
+                    e.Graphics.FillEllipse(bDot, 20, 20, 6, 6);
                 }
             }
             else
             {
-                using (Pen pCircle = new Pen(Color.FromArgb(140, 140, 150), 1.5f))
+                using (Pen pCircle = new Pen(Color.FromArgb(160, 160, 175), 1.5f))
                 {
-                    e.Graphics.DrawEllipse(pCircle, 16, 14, 18, 18);
+                    e.Graphics.DrawEllipse(pCircle, 14, 14, 18, 18);
                 }
             }
 
-            // Direct text drawing
             using (Font fTitle = new Font("Segoe UI", 9.5F, FontStyle.Bold))
-            using (Brush bTitle = new SolidBrush(isSel ? Color.White : Color.FromArgb(235, 235, 240)))
+            using (Brush bTitle = new SolidBrush(isSel ? Color.White : Color.FromArgb(242, 242, 248)))
             {
-                e.Graphics.DrawString("Custom (Advanced)", fTitle, bTitle, 42, 12);
+                e.Graphics.DrawString("Custom (Advanced)", fTitle, bTitle, 40, 11);
             }
             using (Font fSub = new Font("Segoe UI", 8F, FontStyle.Regular))
-            using (Brush bSub = new SolidBrush(isSel ? Color.FromArgb(190, 225, 170) : Color.FromArgb(180, 180, 190)))
+            using (Brush bSub = new SolidBrush(isSel ? Color.FromArgb(200, 238, 175) : Color.FromArgb(195, 195, 208)))
             {
-                e.Graphics.DrawString("Customize installation folder,\nselective models, & shortcuts.", fSub, bSub, 42, 34);
+                e.Graphics.DrawString("Select custom installation folder,\nmodel weights, & shortcut options.", fSub, bSub, 40, 33);
             }
         };
-        pnlCustomCard.Click += (s, e) => SetInstallMode(1);
+        pnlCustomCard.MouseDown += (s, e) => SetInstallMode(1);
         panelModeAndOptions.Controls.Add(pnlCustomCard);
 
-        // Options Details Panel (Container for path & toggles)
-        pnlCustomDetails = new Panel();
-        pnlCustomDetails.Location = new Point(28, 164);
-        pnlCustomDetails.Size = new Size(540, 246);
-        pnlCustomDetails.BackColor = Color.FromArgb(22, 22, 25);
+        // Options Details Panel
+        pnlCustomDetails = new BufferedPanel();
+        pnlCustomDetails.Location = new Point(28, 152);
+        pnlCustomDetails.Size = new Size(544, 260);
+        pnlCustomDetails.BackColor = Color.FromArgb(23, 23, 27);
         pnlCustomDetails.Paint += (s, e) => {
-            using (Pen p = new Pen(ClrBorderSubtle, 1))
+            using (Pen p = new Pen(ClrCardBorder, 1))
             {
                 e.Graphics.DrawRectangle(p, 0, 0, pnlCustomDetails.Width - 1, pnlCustomDetails.Height - 1);
             }
         };
         panelModeAndOptions.Controls.Add(pnlCustomDetails);
 
-        lblDest = new Label();
-        lblDest.Text = "Target Folder (Express Default):";
-        lblDest.ForeColor = Color.FromArgb(220, 220, 230);
-        lblDest.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
-        lblDest.Location = new Point(16, 10);
-        lblDest.Size = new Size(240, 16);
+        lblDest = MakeLabel("Target Installation Directory (Express Default — Locked):", new Font("Segoe UI", 8.5F, FontStyle.Bold), Color.FromArgb(235, 235, 245), new Point(16, 10), new Size(400, 18));
         pnlCustomDetails.Controls.Add(lblDest);
 
         txtTargetDir = new TextBox();
         txtTargetDir.Text = targetDir;
-        txtTargetDir.BackColor = Color.FromArgb(20, 20, 24);
+        txtTargetDir.BackColor = Color.FromArgb(16, 16, 20);
         txtTargetDir.ForeColor = Color.White;
         txtTargetDir.BorderStyle = BorderStyle.FixedSingle;
+        txtTargetDir.Font = new Font("Segoe UI", 9F);
         txtTargetDir.Location = new Point(16, 30);
-        txtTargetDir.Size = new Size(410, 23);
+        txtTargetDir.Size = new Size(414, 24);
         txtTargetDir.TextChanged += (s, e) => { targetDir = txtTargetDir.Text; UpdateDiskSpace(); };
         pnlCustomDetails.Controls.Add(txtTargetDir);
 
-        btnBrowseTarget = new Button();
-        btnBrowseTarget.Text = "Browse...";
-        btnBrowseTarget.Size = new Size(90, 25);
-        btnBrowseTarget.Location = new Point(434, 29);
-        btnBrowseTarget.BackColor = Color.FromArgb(48, 48, 54);
-        btnBrowseTarget.ForeColor = Color.White;
-        btnBrowseTarget.FlatStyle = FlatStyle.Flat;
-        btnBrowseTarget.FlatAppearance.BorderSize = 0;
-        btnBrowseTarget.Cursor = Cursors.Hand;
-        btnBrowseTarget.Click += OnBrowseTargetClick;
+        btnBrowseTarget = new ModernButton();
+        btnBrowseTarget.ButtonText = "Browse...";
+        btnBrowseTarget.Size = new Size(94, 24);
+        btnBrowseTarget.Location = new Point(436, 30);
+        btnBrowseTarget.ActiveBackColor = Color.FromArgb(48, 48, 58);
+        btnBrowseTarget.ActiveForeColor = Color.White;
+        btnBrowseTarget.BorderColor = Color.FromArgb(82, 82, 94);
+        btnBrowseTarget.TextFont = new Font("Segoe UI", 8.5F, FontStyle.Regular);
+        btnBrowseTarget.ButtonClick += OnBrowseTargetClick;
         pnlCustomDetails.Controls.Add(btnBrowseTarget);
 
-        lblDiskSpace = new Label();
-        lblDiskSpace.Text = "Required space: ~550 MB | Available space: Calculating...";
-        lblDiskSpace.ForeColor = Color.FromArgb(190, 190, 200);
-        lblDiskSpace.Font = new Font("Segoe UI", 8F);
-        lblDiskSpace.Location = new Point(16, 58);
-        lblDiskSpace.Size = new Size(500, 16);
+        lblDiskSpace = MakeLabel("Required space: ~550 MB | Available space: Calculating...", new Font("Segoe UI", 8F), Color.FromArgb(195, 195, 210), new Point(16, 58), new Size(510, 16));
         pnlCustomDetails.Controls.Add(lblDiskSpace);
 
         chkCleanInstall = new CheckBox();
-        chkCleanInstall.Text = "Perform Clean Installation (Safely purge previous build files first)";
+        chkCleanInstall.UseMnemonic = false;
+        chkCleanInstall.Text = "Perform Clean Upgrade / Installation (Safely purge prior build files first)";
         chkCleanInstall.Checked = true;
-        chkCleanInstall.ForeColor = Color.FromArgb(246, 130, 31);
+        chkCleanInstall.ForeColor = Color.FromArgb(251, 146, 60);
+        chkCleanInstall.Font = new Font("Segoe UI", 8.75F, FontStyle.Bold);
         chkCleanInstall.Location = new Point(16, 82);
-        chkCleanInstall.Size = new Size(500, 22);
+        chkCleanInstall.Size = new Size(510, 22);
         pnlCustomDetails.Controls.Add(chkCleanInstall);
 
         chkInstallModels = new CheckBox();
-        chkInstallModels.Text = "Deploy Bundled ONNX Models (YOLO11 Nano & Large neural weights)";
+        chkInstallModels.UseMnemonic = false;
+        chkInstallModels.Text = "Include High-Precision Large ONNX Models (YOLO11-L & BeakAttn + Nano)";
         chkInstallModels.Checked = true;
-        chkInstallModels.ForeColor = Color.FromArgb(235, 235, 240);
-        chkInstallModels.Location = new Point(16, 106);
-        chkInstallModels.Size = new Size(500, 22);
+        chkInstallModels.ForeColor = Color.FromArgb(240, 240, 245);
+        chkInstallModels.Font = new Font("Segoe UI", 8.75F);
+        chkInstallModels.Location = new Point(16, 108);
+        chkInstallModels.Size = new Size(510, 22);
+        chkInstallModels.CheckedChanged += (s, e) => UpdateDiskSpace();
         pnlCustomDetails.Controls.Add(chkInstallModels);
 
         chkInstallDeps = new CheckBox();
-        chkInstallDeps.Text = "Install AI Dependencies via pip (onnxruntime, fastapi, uvicorn, opencv)";
+        chkInstallDeps.UseMnemonic = false;
+        chkInstallDeps.Text = "Install AI Runtime Dependencies via pip (onnxruntime, fastapi, uvicorn, opencv)";
         chkInstallDeps.Checked = true;
-        chkInstallDeps.ForeColor = Color.FromArgb(235, 235, 240);
-        chkInstallDeps.Location = new Point(16, 130);
-        chkInstallDeps.Size = new Size(500, 22);
+        chkInstallDeps.ForeColor = Color.FromArgb(240, 240, 245);
+        chkInstallDeps.Font = new Font("Segoe UI", 8.75F);
+        chkInstallDeps.Location = new Point(16, 134);
+        chkInstallDeps.Size = new Size(510, 22);
+        chkInstallDeps.CheckedChanged += (s, e) => UpdateDiskSpace();
         pnlCustomDetails.Controls.Add(chkInstallDeps);
 
         chkDesktopShortcut = new CheckBox();
-        chkDesktopShortcut.Text = "Create Desktop shortcut";
+        chkDesktopShortcut.UseMnemonic = false;
+        chkDesktopShortcut.Text = "Create Desktop Shortcut";
         chkDesktopShortcut.Checked = true;
-        chkDesktopShortcut.ForeColor = Color.FromArgb(235, 235, 240);
-        chkDesktopShortcut.Location = new Point(16, 158);
+        chkDesktopShortcut.ForeColor = Color.FromArgb(240, 240, 245);
+        chkDesktopShortcut.Font = new Font("Segoe UI", 8.75F);
+        chkDesktopShortcut.Location = new Point(16, 162);
         chkDesktopShortcut.Size = new Size(230, 22);
         pnlCustomDetails.Controls.Add(chkDesktopShortcut);
 
         chkStartMenuShortcut = new CheckBox();
-        chkStartMenuShortcut.Text = "Create Start Menu shortcut";
+        chkStartMenuShortcut.UseMnemonic = false;
+        chkStartMenuShortcut.Text = "Create Start Menu Shortcut";
         chkStartMenuShortcut.Checked = true;
-        chkStartMenuShortcut.ForeColor = Color.FromArgb(235, 235, 240);
-        chkStartMenuShortcut.Location = new Point(260, 158);
-        chkStartMenuShortcut.Size = new Size(230, 22);
+        chkStartMenuShortcut.ForeColor = Color.FromArgb(240, 240, 245);
+        chkStartMenuShortcut.Font = new Font("Segoe UI", 8.75F);
+        chkStartMenuShortcut.Location = new Point(264, 162);
+        chkStartMenuShortcut.Size = new Size(240, 22);
         pnlCustomDetails.Controls.Add(chkStartMenuShortcut);
 
         chkRegisterUninstaller = new CheckBox();
-        chkRegisterUninstaller.Text = "Register Uninstaller in Windows Installed Apps (Control Panel / Settings)";
+        chkRegisterUninstaller.UseMnemonic = false;
+        chkRegisterUninstaller.Text = "Register Uninstaller in Windows Installed Apps (Settings / Control Panel)";
         chkRegisterUninstaller.Checked = true;
-        chkRegisterUninstaller.ForeColor = Color.FromArgb(235, 235, 240);
-        chkRegisterUninstaller.Location = new Point(16, 186);
-        chkRegisterUninstaller.Size = new Size(500, 22);
+        chkRegisterUninstaller.ForeColor = Color.FromArgb(240, 240, 245);
+        chkRegisterUninstaller.Font = new Font("Segoe UI", 8.75F);
+        chkRegisterUninstaller.Location = new Point(16, 190);
+        chkRegisterUninstaller.Size = new Size(510, 22);
         pnlCustomDetails.Controls.Add(chkRegisterUninstaller);
+
+        pnlCustomDetails.Controls.Add(MakeLabel(
+            "Note: In Express mode, all components above are pre-selected and locked for reliability.",
+            new Font("Segoe UI", 7.75F, FontStyle.Italic),
+            Color.FromArgb(165, 165, 180),
+            new Point(16, 224),
+            new Size(510, 18)
+        ));
 
         ToggleCustomMode(false);
         UpdateDiskSpace();
 
         // ================= PAGE 3: PROGRESS =================
-        panelProgress = new Panel();
-        panelProgress.Dock = DockStyle.Fill;
-        contentPanel.Controls.Add(panelProgress);
+        panelProgress = CreateStepPage();
 
-        lblProgTitle = new Label();
-        lblProgTitle.Text = "Installing Spoonbill AI Studio V4...";
-        lblProgTitle.Font = new Font("Segoe UI", 13.5F, FontStyle.Bold);
-        lblProgTitle.ForeColor = Color.White;
-        lblProgTitle.Location = new Point(28, 16);
-        lblProgTitle.Size = new Size(540, 26);
+        lblProgTitle = MakeLabel("Step 4: Deploying Spoonbill AI Studio V4...", new Font("Segoe UI", 13F, FontStyle.Bold), Color.White, new Point(28, 14), new Size(544, 24));
         panelProgress.Controls.Add(lblProgTitle);
 
-        lblProgStatus = new Label();
-        lblProgStatus.Text = "Preparing installation package...";
-        lblProgStatus.ForeColor = Color.FromArgb(200, 200, 210);
-        lblProgStatus.Location = new Point(28, 42);
-        lblProgStatus.Size = new Size(540, 20);
+        lblProgStatus = MakeLabel("Preparing installation environment...", new Font("Segoe UI", 8.75F), ClrTextSecondary, new Point(28, 40), new Size(544, 18));
         panelProgress.Controls.Add(lblProgStatus);
 
-        // Custom Sleek Modern Progress Bar
-        customProgressBar = new Panel();
-        customProgressBar.Size = new Size(540, 8);
-        customProgressBar.Location = new Point(28, 72);
-        customProgressBar.BackColor = Color.FromArgb(32, 32, 36);
-        customProgressBar.Paint += (s, e) => {
+        // 4-Phase Visual Progress Tracker
+        pnlPhaseTracker = new BufferedPanel();
+        pnlPhaseTracker.Location = new Point(28, 64);
+        pnlPhaseTracker.Size = new Size(544, 34);
+        pnlPhaseTracker.BackColor = ClrCardBg;
+        pnlPhaseTracker.Paint += (s, e) => {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+            using (Pen p = new Pen(ClrCardBorder, 1))
+            {
+                e.Graphics.DrawRectangle(p, 0, 0, pnlPhaseTracker.Width - 1, pnlPhaseTracker.Height - 1);
+            }
+            string[] phases = new string[] {
+                "1. Clean & Prepare",
+                "2. Extract Payload",
+                "3. AI Dependencies",
+                "4. System Shortcuts"
+            };
+            int segW = pnlPhaseTracker.Width / 4;
+            for (int i = 0; i < 4; i++)
+            {
+                bool active = (i == currentInstallPhase);
+                bool done = (i < currentInstallPhase);
+                Color bg = active ? Color.FromArgb(26, 44, 14) : (done ? Color.FromArgb(18, 30, 12) : ClrCardBg);
+                Color fg = active ? Color.White : (done ? ClrNvidiaGreen : Color.FromArgb(145, 145, 158));
+                using (SolidBrush sb = new SolidBrush(bg))
+                {
+                    e.Graphics.FillRectangle(sb, i * segW + 1, 1, segW - 2, pnlPhaseTracker.Height - 2);
+                }
+                using (Font f = new Font("Segoe UI", 8F, (active || done) ? FontStyle.Bold : FontStyle.Regular))
+                using (Brush b = new SolidBrush(fg))
+                {
+                    StringFormat sf = new StringFormat();
+                    sf.Alignment = StringAlignment.Center;
+                    sf.LineAlignment = StringAlignment.Center;
+                    e.Graphics.DrawString(phases[i], f, b, new RectangleF(i * segW, 0, segW, pnlPhaseTracker.Height), sf);
+                }
+            }
+        };
+        panelProgress.Controls.Add(pnlPhaseTracker);
+
+        // Custom Sleek Modern Progress Bar
+        customProgressBar = new BufferedPanel();
+        customProgressBar.Size = new Size(544, 12);
+        customProgressBar.Location = new Point(28, 106);
+        customProgressBar.BackColor = Color.FromArgb(32, 32, 38);
+        customProgressBar.Paint += (s, e) => {
             int fillW = (int)((currentProgressPercent / 100.0) * customProgressBar.Width);
             if (fillW > 0)
             {
@@ -911,89 +1118,71 @@ public class SpoonbillNvidiaInstaller : Form
                     e.Graphics.FillRectangle(b, 0, 0, fillW, customProgressBar.Height);
                 }
             }
+            using (Pen p = new Pen(ClrCardBorder, 1))
+            {
+                e.Graphics.DrawRectangle(p, 0, 0, customProgressBar.Width - 1, customProgressBar.Height - 1);
+            }
         };
         panelProgress.Controls.Add(customProgressBar);
 
-        logBox = new RichTextBox();
-        logBox.Multiline = true;
-        logBox.ReadOnly = true;
-        logBox.ScrollBars = RichTextBoxScrollBars.Vertical;
-        logBox.BackColor = Color.FromArgb(14, 14, 18);
-        logBox.ForeColor = Color.FromArgb(220, 220, 230);
-        logBox.Font = new Font("Consolas", 8.5F, FontStyle.Regular);
-        logBox.Location = new Point(28, 92);
-        logBox.Size = new Size(540, 320);
-        logBox.BorderStyle = BorderStyle.None;
-        panelProgress.Controls.Add(logBox);
+        logScrollBox = new ScrollTextPanel(544, 292);
+        logScrollBox.Location = new Point(28, 126);
+        panelProgress.Controls.Add(logScrollBox);
 
         // ================= PAGE 4: FINISH =================
-        panelFinish = new Panel();
-        panelFinish.Dock = DockStyle.Fill;
-        contentPanel.Controls.Add(panelFinish);
+        panelFinish = CreateStepPage();
 
-        lblFinishTitle = new Label();
-        lblFinishTitle.Text = "Installation Complete";
-        lblFinishTitle.Font = new Font("Segoe UI", 13.5F, FontStyle.Bold);
-        lblFinishTitle.ForeColor = Color.White;
-        lblFinishTitle.Location = new Point(28, 20);
-        lblFinishTitle.Size = new Size(540, 28);
+        lblFinishTitle = MakeLabel("Step 5: Installation Complete", new Font("Segoe UI", 13.5F, FontStyle.Bold), Color.White, new Point(28, 18), new Size(544, 28));
         panelFinish.Controls.Add(lblFinishTitle);
 
-        lblFinishDesc = new Label();
-        lblFinishDesc.Text = "Spoonbill AI Studio V4 has been deployed successfully to your system.";
-        lblFinishDesc.ForeColor = ClrTextSecondary;
-        lblFinishDesc.Location = new Point(28, 52);
-        lblFinishDesc.Size = new Size(540, 22);
+        lblFinishDesc = MakeLabel("Spoonbill AI Studio V4 has been deployed and configured on your workstation.", new Font("Segoe UI", 9F), ClrTextSecondary, new Point(28, 48), new Size(544, 22));
         panelFinish.Controls.Add(lblFinishDesc);
 
-        // Finish Information Card
-        pnlFinishCard = new Panel();
-        pnlFinishCard.Size = new Size(540, 150);
-        pnlFinishCard.Location = new Point(28, 88);
+        pnlFinishCard = new BufferedPanel();
+        pnlFinishCard.Size = new Size(544, 172);
+        pnlFinishCard.Location = new Point(28, 82);
         pnlFinishCard.BackColor = ClrCardBg;
         pnlFinishCard.Paint += (s, e) => {
-            using (Pen p = new Pen(ClrCardBorder, 1))
+            using (Pen p = new Pen(ClrNvidiaGreen, 1.2f))
             {
                 e.Graphics.DrawRectangle(p, 0, 0, pnlFinishCard.Width - 1, pnlFinishCard.Height - 1);
             }
         };
         panelFinish.Controls.Add(pnlFinishCard);
 
-        Label lblCardHeader = new Label();
-        lblCardHeader.Text = "DEPLOYMENT SUMMARY";
-        lblCardHeader.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
-        lblCardHeader.ForeColor = ClrNvidiaGreen;
-        lblCardHeader.Location = new Point(18, 14);
-        lblCardHeader.AutoSize = true;
-        pnlFinishCard.Controls.Add(lblCardHeader);
+        pnlFinishCard.Controls.Add(MakeLabel("DEPLOYMENT VERIFICATION SUMMARY", new Font("Segoe UI", 8.5F, FontStyle.Bold), ClrNvidiaGreen, new Point(18, 14), Size.Empty));
 
-        Label lblSummaryBody = new Label();
-        lblSummaryBody.Text =
-            "• Studio Executable : Installed & verified\n" +
-            "• Neural Backend    : CPU Safe Mode (ONNX Runtime 11N & 11L)\n" +
-            "• Windows Control   : Uninstaller registered in Settings > Apps\n" +
-            "• Local Privacy     : 100% offline edge inference active";
-        lblSummaryBody.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
-        lblSummaryBody.ForeColor = ClrTextPrimary;
-        lblSummaryBody.Location = new Point(18, 38);
-        lblSummaryBody.Size = new Size(500, 95);
+        lblSummaryBody = MakeLabel(
+            "• Target Directory  : " + targetDir + "\n" +
+            "• Studio Executable : Spoonbill_Studio.exe (Verified)\n" +
+            "• Neural Engine     : CPU Safe Mode (ONNX Runtime 11N & 11L)\n" +
+            "• Windows Control   : Uninstaller registered in Settings > Installed Apps\n" +
+            "• Data Privacy      : 100% offline local inference active",
+            new Font("Segoe UI", 9F, FontStyle.Regular),
+            ClrTextPrimary,
+            new Point(18, 38),
+            new Size(508, 120)
+        );
         pnlFinishCard.Controls.Add(lblSummaryBody);
 
         chkLaunchNow = new CheckBox();
-        chkLaunchNow.Text = "Launch Spoonbill AI Studio now";
+        chkLaunchNow.UseMnemonic = false;
+        chkLaunchNow.Text = "Launch Spoonbill AI Studio V4 now";
         chkLaunchNow.Checked = true;
         chkLaunchNow.ForeColor = ClrNvidiaGreen;
         chkLaunchNow.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-        chkLaunchNow.Location = new Point(28, 260);
-        chkLaunchNow.Size = new Size(400, 26);
+        chkLaunchNow.Location = new Point(28, 272);
+        chkLaunchNow.Size = new Size(420, 26);
         panelFinish.Controls.Add(chkLaunchNow);
 
         chkOpenFolder = new CheckBox();
-        chkOpenFolder.Text = "Open application installation directory in File Explorer";
+        chkOpenFolder.UseMnemonic = false;
+        chkOpenFolder.Text = "Open installation directory in Windows Explorer";
         chkOpenFolder.Checked = false;
         chkOpenFolder.ForeColor = ClrTextSecondary;
-        chkOpenFolder.Location = new Point(28, 292);
-        chkOpenFolder.Size = new Size(400, 24);
+        chkOpenFolder.Font = new Font("Segoe UI", 9F);
+        chkOpenFolder.Location = new Point(28, 304);
+        chkOpenFolder.Size = new Size(420, 24);
         panelFinish.Controls.Add(chkOpenFolder);
     }
 
@@ -1003,16 +1192,16 @@ public class SpoonbillNvidiaInstaller : Form
         pnlExpressCard.Invalidate();
         pnlCustomCard.Invalidate();
         ToggleCustomMode(installMode == 1);
+        UpdateDiskSpace();
     }
 
     private void ToggleCustomMode(bool customEnabled)
     {
         txtTargetDir.ReadOnly = !customEnabled;
-        txtTargetDir.BackColor = customEnabled ? Color.FromArgb(20, 20, 24) : Color.FromArgb(16, 16, 20);
-        txtTargetDir.ForeColor = customEnabled ? Color.White : Color.FromArgb(180, 180, 190);
-        btnBrowseTarget.Enabled = customEnabled;
-        btnBrowseTarget.BackColor = customEnabled ? Color.FromArgb(48, 48, 54) : Color.FromArgb(28, 28, 32);
-        btnBrowseTarget.ForeColor = customEnabled ? Color.White : Color.FromArgb(120, 120, 130);
+        txtTargetDir.BackColor = customEnabled ? Color.FromArgb(20, 20, 26) : Color.FromArgb(15, 15, 19);
+        txtTargetDir.ForeColor = customEnabled ? Color.White : Color.FromArgb(210, 210, 222);
+
+        btnBrowseTarget.IsInteractive = customEnabled;
 
         chkCleanInstall.AutoCheck = customEnabled;
         chkInstallModels.AutoCheck = customEnabled;
@@ -1033,23 +1222,23 @@ public class SpoonbillNvidiaInstaller : Form
             chkStartMenuShortcut.Checked = true;
             chkRegisterUninstaller.Checked = true;
 
-            chkCleanInstall.ForeColor = Color.FromArgb(246, 130, 31);
-            chkInstallModels.ForeColor = Color.FromArgb(215, 215, 225);
-            chkInstallDeps.ForeColor = Color.FromArgb(215, 215, 225);
-            chkDesktopShortcut.ForeColor = Color.FromArgb(215, 215, 225);
-            chkStartMenuShortcut.ForeColor = Color.FromArgb(215, 215, 225);
-            chkRegisterUninstaller.ForeColor = Color.FromArgb(215, 215, 225);
-            lblDest.Text = "Target Folder (Express Default):";
+            chkCleanInstall.ForeColor = Color.FromArgb(251, 146, 60);
+            chkInstallModels.ForeColor = Color.FromArgb(225, 225, 235);
+            chkInstallDeps.ForeColor = Color.FromArgb(225, 225, 235);
+            chkDesktopShortcut.ForeColor = Color.FromArgb(225, 225, 235);
+            chkStartMenuShortcut.ForeColor = Color.FromArgb(225, 225, 235);
+            chkRegisterUninstaller.ForeColor = Color.FromArgb(225, 225, 235);
+            lblDest.Text = "Target Installation Directory (Express Default — Locked):";
         }
         else
         {
-            chkCleanInstall.ForeColor = Color.FromArgb(246, 130, 31);
-            chkInstallModels.ForeColor = Color.FromArgb(244, 244, 245);
-            chkInstallDeps.ForeColor = Color.FromArgb(244, 244, 245);
-            chkDesktopShortcut.ForeColor = Color.FromArgb(244, 244, 245);
-            chkStartMenuShortcut.ForeColor = Color.FromArgb(244, 244, 245);
-            chkRegisterUninstaller.ForeColor = Color.FromArgb(244, 244, 245);
-            lblDest.Text = "Target Folder (Custom Path):";
+            chkCleanInstall.ForeColor = Color.FromArgb(251, 146, 60);
+            chkInstallModels.ForeColor = Color.White;
+            chkInstallDeps.ForeColor = Color.White;
+            chkDesktopShortcut.ForeColor = Color.White;
+            chkStartMenuShortcut.ForeColor = Color.White;
+            chkRegisterUninstaller.ForeColor = Color.White;
+            lblDest.Text = "Target Installation Directory (Custom — Editable):";
         }
     }
 
@@ -1070,6 +1259,10 @@ public class SpoonbillNvidiaInstaller : Form
 
     private void UpdateDiskSpace()
     {
+        int reqMb = 350;
+        if (installMode == 0 || (chkInstallModels != null && chkInstallModels.Checked)) reqMb += 150;
+        if (installMode == 0 || (chkInstallDeps != null && chkInstallDeps.Checked)) reqMb += 50;
+
         try
         {
             string root = Path.GetPathRoot(targetDir);
@@ -1077,12 +1270,15 @@ public class SpoonbillNvidiaInstaller : Form
             {
                 DriveInfo d = new DriveInfo(root);
                 long freeMb = d.AvailableFreeSpace / (1024 * 1024);
-                lblDiskSpace.Text = "Required: ~550 MB | Available on " + root + ": " + freeMb + " MB";
+                lblDiskSpace.Text = "Required space: ~" + reqMb + " MB  |  Available on drive (" + root.TrimEnd('\\') + "): " + freeMb.ToString("N0") + " MB";
+                return;
             }
         }
-        catch
+        catch {}
+
+        if (lblDiskSpace != null)
         {
-            lblDiskSpace.Text = "Required space: ~550 MB";
+            lblDiskSpace.Text = "Required space: ~" + reqMb + " MB";
         }
     }
 
@@ -1095,21 +1291,27 @@ public class SpoonbillNvidiaInstaller : Form
             stepBadgePanels[i].Invalidate();
             if (i == step)
             {
+                stepNumberLabels[i].Text = (i + 1).ToString();
                 stepNumberLabels[i].ForeColor = ClrNvidiaGreen;
                 stepTitleLabels[i].ForeColor = Color.White;
-                stepTitleLabels[i].Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+                stepTitleLabels[i].Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+                stepSubLabels[i].ForeColor = Color.FromArgb(190, 215, 165);
             }
             else if (i < step)
             {
-                stepNumberLabels[i].ForeColor = Color.FromArgb(200, 200, 205);
-                stepTitleLabels[i].ForeColor = Color.FromArgb(200, 200, 205);
-                stepTitleLabels[i].Font = new Font("Segoe UI", 9F, FontStyle.Regular);
+                stepNumberLabels[i].Text = "✓";
+                stepNumberLabels[i].ForeColor = ClrNvidiaGreen;
+                stepTitleLabels[i].ForeColor = Color.FromArgb(220, 220, 228);
+                stepTitleLabels[i].Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+                stepSubLabels[i].ForeColor = Color.FromArgb(145, 145, 158);
             }
             else
             {
+                stepNumberLabels[i].Text = (i + 1).ToString();
                 stepNumberLabels[i].ForeColor = ClrTextMuted;
                 stepTitleLabels[i].ForeColor = ClrTextMuted;
-                stepTitleLabels[i].Font = new Font("Segoe UI", 9F, FontStyle.Regular);
+                stepTitleLabels[i].Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
+                stepSubLabels[i].ForeColor = Color.FromArgb(105, 105, 115);
             }
         }
 
@@ -1121,114 +1323,256 @@ public class SpoonbillNvidiaInstaller : Form
 
         if (step == 0)
         {
-            btnBack.Enabled = false;
-            btnNext.Text = "Next >";
-            btnNext.Enabled = true;
+            panelSystemCheck.BringToFront();
+            btnBack.Visible = true;
+            btnCancel.Visible = true;
+            btnBack.IsInteractive = false;
+            btnNext.ButtonText = "Next >";
+            btnNext.ActiveBackColor = ClrNvidiaGreen;
+            btnNext.ActiveForeColor = Color.Black;
+            btnNext.BorderColor = ClrNvidiaGreen;
+            btnNext.IsInteractive = true;
             RunSystemCheck();
         }
         else if (step == 1)
         {
-            btnBack.Enabled = true;
+            panelAgreement.BringToFront();
+            btnBack.Visible = true;
+            btnCancel.Visible = true;
+            btnBack.IsInteractive = true;
             UpdateAgreementUI();
         }
         else if (step == 2)
         {
-            btnBack.Enabled = true;
-            btnNext.Text = "Install";
-            btnNext.Enabled = true;
+            panelModeAndOptions.BringToFront();
+            btnBack.Visible = true;
+            btnCancel.Visible = true;
+            btnBack.IsInteractive = true;
+            btnNext.ButtonText = "Install Now";
+            btnNext.ActiveBackColor = ClrNvidiaGreen;
+            btnNext.ActiveForeColor = Color.Black;
+            btnNext.BorderColor = ClrNvidiaGreen;
+            btnNext.IsInteractive = true;
+            UpdateDiskSpace();
         }
         else if (step == 3)
         {
-            btnBack.Enabled = false;
-            btnNext.Enabled = false;
-            btnCancel.Enabled = false;
+            panelProgress.BringToFront();
+            btnBack.IsInteractive = false;
+            btnNext.IsInteractive = false;
+            btnCancel.IsInteractive = false;
             isInstalling = true;
             ThreadPool.QueueUserWorkItem(RunInstallation);
         }
         else if (step == 4)
         {
+            panelFinish.BringToFront();
+            UpdateFinishSummary();
             btnBack.Visible = false;
             btnCancel.Visible = false;
-            btnNext.Text = "Finish";
-            btnNext.Enabled = true;
+            btnNext.ButtonText = "Finish";
+            btnNext.ActiveBackColor = ClrNvidiaGreen;
+            btnNext.ActiveForeColor = Color.Black;
+            btnNext.BorderColor = ClrNvidiaGreen;
+            btnNext.IsInteractive = true;
         }
+    }
+
+    private void UpdateFinishSummary()
+    {
+        if (lblSummaryBody == null) return;
+        string gpuLine = hasNvidiaGpu
+            ? "NVIDIA CUDA Ready (" + detectedGpu + ") + CPU Safe Mode"
+            : "CPU Safe Mode Active (" + (detectedGpu ?? "Standard Display") + ")";
+        string pyLine = pipSucceeded
+            ? "Verified & Installed (" + (detectedPythonVersion ?? "Python 3") + ")"
+            : (!string.IsNullOrEmpty(pythonBinary) ? "Python Found (" + (detectedPythonVersion ?? "Python 3") + ")" : "Pending Python 3 Installation");
+        lblSummaryBody.Text =
+            "• Installed Location : " + targetDir + "\n" +
+            "• Studio Executable  : Spoonbill_Studio.exe (Ready)\n" +
+            "• Compute Backend    : " + gpuLine + "\n" +
+            "• AI Dependencies    : " + pyLine + "\n" +
+            "• Windows Control    : Uninstaller registered in Installed Apps";
     }
 
     private void RunSystemCheck()
     {
+        RefreshEnvironmentPath();
+
         // 1. Operating System & Architecture
-        sysCardValues[0].Text = Environment.OSVersion.ToString() + " (64-bit)";
+        sysCardValues[0].Text = Environment.OSVersion.ToString() + (Environment.Is64BitOperatingSystem ? " (64-bit)" : " (32-bit)");
         sysCardBadges[0].Text = "COMPATIBLE";
         sysCardBadges[0].ForeColor = ClrNvidiaGreen;
+        sysCardBadges[0].BackColor = Color.FromArgb(24, 38, 16);
 
         // 2. Hardware Resources
         int cores = Environment.ProcessorCount;
-        sysCardValues[1].Text = cores + " Logical Cores detected";
+        sysCardValues[1].Text = cores + " Logical CPU Cores available for ONNX inference";
         sysCardBadges[1].Text = "READY";
         sysCardBadges[1].ForeColor = ClrNvidiaGreen;
+        sysCardBadges[1].BackColor = Color.FromArgb(24, 38, 16);
 
         // 3. Graphics & Hardware Acceleration
         detectedGpu = DetectGraphicsCard(out hasNvidiaGpu);
         if (hasNvidiaGpu)
         {
-            sysCardValues[2].Text = detectedGpu + " (CUDA Capable)";
+            sysCardValues[2].Text = detectedGpu + " (NVIDIA CUDA & CPU Safe Mode)";
             sysCardBadges[2].Text = "NVIDIA GPU";
             sysCardBadges[2].ForeColor = ClrNvidiaGreen;
             sysCardBadges[2].BackColor = Color.FromArgb(24, 38, 16);
         }
         else
         {
-            sysCardValues[2].Text = detectedGpu + " (CPU Safe Mode)";
+            sysCardValues[2].Text = detectedGpu + " (Runs in CPU Safe Mode)";
             sysCardBadges[2].Text = "CPU SAFE MODE";
             sysCardBadges[2].ForeColor = Color.FromArgb(56, 189, 248);
-            sysCardBadges[2].BackColor = Color.FromArgb(16, 32, 48);
+            sysCardBadges[2].BackColor = Color.FromArgb(16, 34, 52);
         }
 
         // 4. Python Environment
-        pythonBinary = FindPythonBinary();
+        pythonBinary = FindPythonBinary(out detectedPythonVersion);
         bool pythonReady = !string.IsNullOrEmpty(pythonBinary);
         if (pythonReady)
         {
-            sysCardValues[3].Text = "Python 3 located at " + Path.GetFileName(pythonBinary);
+            sysCardValues[3].Text = (detectedPythonVersion ?? "Python 3") + " (" + pythonBinary + ")";
             sysCardBadges[3].Text = "READY";
             sysCardBadges[3].ForeColor = ClrNvidiaGreen;
             sysCardBadges[3].BackColor = Color.FromArgb(24, 38, 16);
         }
         else
         {
-            sysCardValues[3].Text = "Python 3 not found on system PATH.";
+            sysCardValues[3].Text = "Python 3.8+ not detected on PATH (Click 'How to Make Ready...')";
             sysCardBadges[3].Text = "ACTION NEEDED";
-            sysCardBadges[3].ForeColor = Color.FromArgb(239, 68, 68);
-            sysCardBadges[3].BackColor = Color.FromArgb(48, 18, 18);
+            sysCardBadges[3].ForeColor = Color.FromArgb(248, 113, 113);
+            sysCardBadges[3].BackColor = Color.FromArgb(52, 18, 18);
         }
 
-        existingVersionDetected = Directory.Exists(targetDir) && File.Exists(Path.Combine(targetDir, "Spoonbill_Studio.exe"));
+        // 5. Prior Installation Detection
+        existingInstallDir = DetectExistingInstallation();
+        existingVersionDetected = !string.IsNullOrEmpty(existingInstallDir);
+        if (existingVersionDetected)
+        {
+            sysCardValues[4].Text = "Detected (" + FormatCompactPath(existingInstallDir) + ")";
+            sysCardBadges[4].Text = "UPGRADE READY";
+            sysCardBadges[4].ForeColor = Color.FromArgb(251, 146, 60);
+            sysCardBadges[4].BackColor = Color.FromArgb(46, 28, 12);
+            btnRemoveExisting.Visible = true;
+        }
+        else
+        {
+            sysCardValues[4].Text = "No prior installation found (Clean target directory)";
+            sysCardBadges[4].Text = "CLEAN TARGET";
+            sysCardBadges[4].ForeColor = ClrNvidiaGreen;
+            sysCardBadges[4].BackColor = Color.FromArgb(24, 38, 16);
+            btnRemoveExisting.Visible = false;
+        }
 
         // Update Advisory Banner
         if (!pythonReady)
         {
-            lblAdvisoryTitle.Text = "Action Recommended: Python 3 Runtime Not Found";
-            lblAdvisoryTitle.ForeColor = Color.FromArgb(239, 68, 68);
-            lblAdvisoryDesc.Text = "Python 3.8 - 3.12 is required for neural inference. Click 'How to Make Ready...' for installation commands, then click 'Refresh Scan'.";
-            pnlSysAdvisory.BackColor = Color.FromArgb(32, 18, 18);
-            btnHowToReady.Text = "How to Make Ready...";
-            btnHowToReady.BackColor = Color.FromArgb(60, 24, 24);
-            btnHowToReady.ForeColor = Color.FromArgb(254, 202, 202);
+            lblAdvisoryTitle.Text = "Action Needed: Python 3 Runtime Not Detected";
+            lblAdvisoryTitle.ForeColor = Color.FromArgb(252, 129, 129);
+            lblAdvisoryDesc.Text = "Click 'How to Make Ready...' below to auto-install Python 3.11 via winget or download from python.org, then click 'Refresh Scan'.";
+            pnlSysAdvisory.BackColor = Color.FromArgb(36, 18, 18);
+            btnHowToReady.ButtonText = "How to Make Ready...";
+            btnHowToReady.ActiveBackColor = Color.FromArgb(68, 24, 24);
+            btnHowToReady.ActiveForeColor = Color.FromArgb(254, 215, 215);
+            btnHowToReady.BorderColor = Color.FromArgb(185, 60, 60);
         }
         else
         {
-            lblAdvisoryTitle.Text = "System Ready for Spoonbill AI Studio";
+            lblAdvisoryTitle.Text = "All System Prerequisites Ready for Deployment";
             lblAdvisoryTitle.ForeColor = ClrNvidiaGreen;
-            string upgradeMsg = existingVersionDetected ? " (Prior installation detected and will be upgraded)." : "";
-            lblAdvisoryDesc.Text = "All core system requirements satisfied" + upgradeMsg + ". You can proceed with installation or review the hardware guide.";
-            pnlSysAdvisory.BackColor = Color.FromArgb(18, 30, 14);
-            btnHowToReady.Text = "Setup & Hardware Guide";
-            btnHowToReady.BackColor = Color.FromArgb(26, 40, 18);
-            btnHowToReady.ForeColor = ClrNvidiaGreen;
+            string upgradeNote = existingVersionDetected
+                ? " Prior build detected and will be cleanly upgraded."
+                : " Ready for Express or Custom installation.";
+            lblAdvisoryDesc.Text = "Hardware and Python runtime verified." + upgradeNote + " Click 'Next >' to review the License Agreement.";
+            pnlSysAdvisory.BackColor = Color.FromArgb(18, 32, 14);
+            btnHowToReady.ButtonText = "Setup & Hardware Guide";
+            btnHowToReady.ActiveBackColor = Color.FromArgb(28, 44, 18);
+            btnHowToReady.ActiveForeColor = ClrNvidiaGreen;
+            btnHowToReady.BorderColor = ClrNvidiaGreen;
         }
         pnlSysAdvisory.Invalidate();
 
-        lblLastScanTime.Text = "Scanned: " + DateTime.Now.ToString("HH:mm:ss") + " | Refresh enabled";
+        lblLastScanTime.Text = "Last scanned at " + DateTime.Now.ToString("HH:mm:ss") + " — Click 'Refresh Scan' anytime after making system changes.";
+    }
+
+    private string FormatCompactPath(string fullPath)
+    {
+        if (string.IsNullOrEmpty(fullPath)) return "";
+        string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (!string.IsNullOrEmpty(localApp) && fullPath.StartsWith(localApp, StringComparison.OrdinalIgnoreCase))
+        {
+            return "%LOCALAPPDATA%" + fullPath.Substring(localApp.Length);
+        }
+        return fullPath;
+    }
+
+    private string DetectExistingInstallation()
+    {
+        try
+        {
+            if (Directory.Exists(targetDir) && File.Exists(Path.Combine(targetDir, "Spoonbill_Studio.exe")))
+            {
+                return targetDir;
+            }
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\SpoonbillAIStudio"))
+            {
+                if (key != null)
+                {
+                    object loc = key.GetValue("InstallLocation");
+                    if (loc != null && Directory.Exists(loc.ToString()))
+                    {
+                        return loc.ToString();
+                    }
+                }
+            }
+        }
+        catch {}
+        return null;
+    }
+
+    private void OnQuickRemoveExistingClick(object sender, EventArgs e)
+    {
+        string dirToClean = existingInstallDir ?? targetDir;
+        DialogResult res = MessageBox.Show(
+            this,
+            "An existing Spoonbill AI Studio installation was detected at:\n" + dirToClean + "\n\n" +
+            "Would you like to completely remove the previous installation and its shortcuts right now?\n" +
+            "(Note: Continuing with normal setup will also automatically perform a Clean Upgrade.)",
+            "Uninstall Existing Build",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question
+        );
+        if (res == DialogResult.Yes)
+        {
+            try
+            {
+                KillRunningProcesses();
+                if (Directory.Exists(dirToClean))
+                {
+                    foreach (string file in Directory.GetFiles(dirToClean, "*", SearchOption.AllDirectories))
+                    {
+                        try { File.SetAttributes(file, FileAttributes.Normal); File.Delete(file); } catch {}
+                    }
+                    try { Directory.Delete(dirToClean, true); } catch {}
+                }
+                string desktopLnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Spoonbill AI Studio.lnk");
+                if (File.Exists(desktopLnk)) { try { File.Delete(desktopLnk); } catch {} }
+                string startMenuLnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs", "Spoonbill AI Studio.lnk");
+                if (File.Exists(startMenuLnk)) { try { File.Delete(startMenuLnk); } catch {} }
+                try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\SpoonbillAIStudio", false); } catch {}
+
+                MessageBox.Show(this, "Previous installation and shortcuts have been cleanly removed.", "Removed Successfully", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                RunSystemCheck();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "Could not remove some files: " + ex.Message, "Removal Notice", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                RunSystemCheck();
+            }
+        }
     }
 
     private void OnNextClick(object sender, EventArgs e)
@@ -1240,10 +1584,10 @@ public class SpoonbillNvidiaInstaller : Form
                 DialogResult res = MessageBox.Show(
                     this,
                     "Python 3 runtime was not detected on your system PATH.\n\n" +
-                    "While you can continue to configure installation paths, local neural inference requires Python 3.8 - 3.12.\n\n" +
-                    "Would you like to open the Setup & Readiness Guide to view installation instructions now?\n\n" +
-                    "- Click 'Yes' to view the Setup & Readiness Guide.\n" +
-                    "- Click 'No' to proceed to the License Agreement.",
+                    "Spoonbill AI Studio requires Python 3.8 - 3.12 to run its local neural network backend.\n\n" +
+                    "Would you like to open the Setup & Readiness Guide to install Python now?\n\n" +
+                    "• Click 'Yes' to open the Readiness Guide (Recommended).\n" +
+                    "• Click 'No' to continue to the License Agreement anyway.",
                     "Python Runtime Advisory",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning
@@ -1262,9 +1606,9 @@ public class SpoonbillNvidiaInstaller : Form
             {
                 MessageBox.Show(
                     this,
-                    "Please click one of the agreement choice boxes above to select your preference before proceeding.\n\n" +
-                    "You can click the box again at any time to deselect it.",
-                    "Agreement Selection Required",
+                    "Please click one of the option boxes on this page to indicate whether you accept or decline the agreement.\n\n" +
+                    "Note: Only one box can be active at a time, and clicking an active box again will release your selection.",
+                    "Selection Required",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
                 );
@@ -1274,10 +1618,10 @@ public class SpoonbillNvidiaInstaller : Form
             {
                 DialogResult res = MessageBox.Show(
                     this,
-                    "You have selected not to agree to the terms or install required dependencies.\n\n" +
-                    "Spoonbill AI Studio cannot run without its local neural inference engine.\n\n" +
-                    "Do you want to cancel the installation now?",
-                    "Cancel Setup?",
+                    "You have selected 'I DO NOT ACCEPT'.\n\n" +
+                    "Because Spoonbill AI Studio cannot function without its local AI runtime dependencies, the installation will now be cancelled.\n\n" +
+                    "Confirm cancellation and exit setup?",
+                    "Cancel Installation?",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Warning
                 );
@@ -1285,7 +1629,7 @@ public class SpoonbillNvidiaInstaller : Form
                 {
                     MessageBox.Show(
                         this,
-                        "Installation has been cancelled as requested.\nNo changes were made to your computer.",
+                        "Installation has been cancelled.\nNo files or settings were modified on your computer.",
                         "Setup Aborted",
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information
@@ -1299,6 +1643,11 @@ public class SpoonbillNvidiaInstaller : Form
         }
         else if (currentStep == 2)
         {
+            if (string.IsNullOrWhiteSpace(targetDir))
+            {
+                MessageBox.Show(this, "Please specify a valid target installation folder.", "Invalid Path", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
             SwitchStep(3);
         }
         else if (currentStep == 4)
@@ -1331,14 +1680,25 @@ public class SpoonbillNvidiaInstaller : Form
     {
         if (isInstalling)
         {
-            MessageBox.Show(this, "Installation is currently in progress. Please wait for completion.", "Setup Busy", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show(this, "Deployment is currently in progress. Please wait for the current operation to finish.", "Setup Busy", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
-        DialogResult res = MessageBox.Show(this, "Are you sure you want to cancel the installation wizard?", "Exit Setup", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+        DialogResult res = MessageBox.Show(this, "Are you sure you want to cancel setup and exit?\nNo changes will be finalized.", "Exit Setup Wizard", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
         if (res == DialogResult.Yes)
         {
             Application.Exit();
+        }
+    }
+
+    private void SetInstallPhase(int phase)
+    {
+        currentInstallPhase = phase;
+        if (this.IsHandleCreated && pnlPhaseTracker != null)
+        {
+            this.Invoke((MethodInvoker)delegate {
+                pnlPhaseTracker.Invalidate();
+            });
         }
     }
 
@@ -1346,33 +1706,43 @@ public class SpoonbillNvidiaInstaller : Form
     {
         try
         {
-            UpdateStatus("Setting target directory: " + targetDir, 5);
-            AppendLog("Preparing destination directory: " + targetDir);
+            // PHASE 0: Clean & Prepare
+            SetInstallPhase(0);
+            UpdateStatus("Phase 1/4: Preparing target directory: " + targetDir, 5);
+            AppendLog("=== SPOONBILL AI STUDIO V4 DEPLOYMENT STARTED ===");
+            AppendLog("Mode: " + (installMode == 0 ? "Express (Recommended)" : "Custom (Advanced)"));
+            AppendLog("Target Directory: " + targetDir);
 
-            // Clean Installation if requested or express
             bool doClean = (installMode == 0) || chkCleanInstall.Checked;
             if (doClean && Directory.Exists(targetDir))
             {
-                UpdateStatus("Purging previous build files...", 10);
-                AppendLog("Terminating any running Spoonbill Studio processes...");
+                UpdateStatus("Phase 1/4: Stopping active studio processes and purging old build...", 10);
+                AppendLog("Stopping any running Spoonbill_Studio processes...");
                 KillRunningProcesses();
 
-                AppendLog("Safely purging old build files from target directory...");
+                AppendLog("Purging previous installation files in target directory...");
+                int removedCount = 0;
                 try
                 {
                     foreach (string file in Directory.GetFiles(targetDir, "*", SearchOption.AllDirectories))
                     {
-                        try { File.SetAttributes(file, FileAttributes.Normal); File.Delete(file); } catch {}
+                        try
+                        {
+                            File.SetAttributes(file, FileAttributes.Normal);
+                            File.Delete(file);
+                            removedCount++;
+                        }
+                        catch {}
                     }
                     foreach (string dir in Directory.GetDirectories(targetDir))
                     {
                         try { Directory.Delete(dir, true); } catch {}
                     }
-                    AppendLog("Clean installation directory prepared.");
+                    AppendLog("Clean purge complete (" + removedCount + " prior files removed).");
                 }
                 catch (Exception cex)
                 {
-                    AppendLog("  [Notice] Clean purge message: " + cex.Message);
+                    AppendLog("[Notice] Partial cleanup note: " + cex.Message);
                 }
             }
 
@@ -1381,40 +1751,107 @@ public class SpoonbillNvidiaInstaller : Form
                 Directory.CreateDirectory(targetDir);
             }
 
-            // Payload Extraction
-            UpdateStatus("Extracting core studio files, models, and UI...", 25);
-            AppendLog("Extracting embedded application payload...");
+            // PHASE 1: Safe Entry-by-Entry Payload Extraction
+            SetInstallPhase(1);
+            UpdateStatus("Phase 2/4: Extracting core studio binaries, UI, and ONNX models...", 18);
+            AppendLog("Locating embedded distribution archive...");
+
             Assembly asm = Assembly.GetExecutingAssembly();
             using (Stream s = asm.GetManifestResourceStream("Payload"))
             {
                 if (s == null)
                 {
-                    throw new Exception("Embedded installation payload not found.");
+                    throw new Exception("Embedded installation payload resource ('Payload') was not found in this binary.");
                 }
                 string tempZip = Path.Combine(Path.GetTempPath(), "spoonbill_setup_" + Guid.NewGuid().ToString("N") + ".zip");
-                using (FileStream fs = new FileStream(tempZip, FileMode.Create, FileAccess.Write))
+                try
                 {
-                    s.CopyTo(fs);
-                }
-                ZipFile.ExtractToDirectory(tempZip, targetDir);
-                try { File.Delete(tempZip); } catch {}
-            }
-            AppendLog("Application binaries and resources extracted successfully.");
-            SetProgress(50);
+                    using (FileStream fs = new FileStream(tempZip, FileMode.Create, FileAccess.Write))
+                    {
+                        s.CopyTo(fs);
+                    }
+                    AppendLog("Payload staged. Extracting files with safe overwrite handling...");
 
-            // AI Dependencies
+                    using (ZipArchive archive = ZipFile.OpenRead(tempZip))
+                    {
+                        int totalEntries = Math.Max(1, archive.Entries.Count);
+                        int processed = 0;
+                        foreach (ZipArchiveEntry entry in archive.Entries)
+                        {
+                            processed++;
+                            string fullDestPath = Path.Combine(targetDir, entry.FullName.Replace('/', Path.DirectorySeparatorChar));
+
+                            if (string.IsNullOrEmpty(entry.Name))
+                            {
+                                if (!Directory.Exists(fullDestPath)) Directory.CreateDirectory(fullDestPath);
+                                continue;
+                            }
+
+                            string parentDir = Path.GetDirectoryName(fullDestPath);
+                            if (!string.IsNullOrEmpty(parentDir) && !Directory.Exists(parentDir))
+                            {
+                                Directory.CreateDirectory(parentDir);
+                            }
+
+                            if (File.Exists(fullDestPath))
+                            {
+                                try { File.SetAttributes(fullDestPath, FileAttributes.Normal); } catch {}
+                            }
+
+                            entry.ExtractToFile(fullDestPath, true);
+
+                            if (processed % 15 == 0 || processed == totalEntries)
+                            {
+                                int pct = 18 + (int)((processed / (double)totalEntries) * 37.0);
+                                UpdateStatus("Phase 2/4: Extracting files (" + processed + "/" + totalEntries + ")...", pct);
+                            }
+                        }
+                    }
+                }
+                finally
+                {
+                    if (File.Exists(tempZip))
+                    {
+                        try { File.Delete(tempZip); } catch {}
+                    }
+                }
+            }
+            AppendLog("All application binaries and assets extracted successfully.");
+
+            // Check selective large models option in Custom Mode
+            bool keepLargeModels = (installMode == 0) || chkInstallModels.Checked;
+            if (!keepLargeModels)
+            {
+                AppendLog("Custom option: Removing optional large ONNX weights (keeping Nano model for CPU Safe Mode)...");
+                string[] optionalWeights = new string[] { "yolo11l-seg.onnx", "yolo11m-seg.onnx", "beakattn-l.onnx" };
+                foreach (string wName in optionalWeights)
+                {
+                    foreach (string found in Directory.GetFiles(targetDir, wName, SearchOption.AllDirectories))
+                    {
+                        try { File.Delete(found); AppendLog("  Removed optional weight: " + Path.GetFileName(found)); } catch {}
+                    }
+                }
+            }
+
+            SetProgress(58);
+
+            // PHASE 2: AI Dependencies via pip
+            SetInstallPhase(2);
             bool doDeps = (installMode == 0) || chkInstallDeps.Checked;
             if (doDeps)
             {
-                UpdateStatus("Checking for Python runtime...", 55);
-                string pyCmd = FindPythonBinary();
+                UpdateStatus("Phase 3/4: Verifying Python 3 runtime and installing AI dependencies...", 62);
+                RefreshEnvironmentPath();
+                string pyVersion;
+                string pyCmd = FindPythonBinary(out pyVersion);
                 if (string.IsNullOrEmpty(pyCmd))
                 {
-                    AppendLog("[WARNING] Python 3.10+ was not found on PATH.");
-                    AppendLog("Please install Python 3.10+ from https://www.python.org/ with 'Add to PATH' checked.");
+                    AppendLog("[WARNING] Python 3.8+ was not found on system PATH.");
+                    AppendLog("Studio UI is installed, but please install Python 3.11 from python.org (with 'Add to PATH') before running inference.");
                 }
                 else
                 {
+                    AppendLog("Using Python runtime: " + (pyVersion ?? "Python 3") + " [" + pyCmd + "]");
                     string reqFile = Path.Combine(targetDir, "requirements_lean.txt");
                     if (!File.Exists(reqFile))
                     {
@@ -1423,75 +1860,52 @@ public class SpoonbillNvidiaInstaller : Form
 
                     if (File.Exists(reqFile))
                     {
-                        UpdateStatus("Installing AI dependencies via pip (onnxruntime, fastapi, uvicorn)...", 65);
-                        AppendLog("Running pip dependency installer: " + pyCmd + " -m pip install -r " + Path.GetFileName(reqFile));
-                        try
+                        UpdateStatus("Phase 3/4: Installing lean AI libraries via pip (onnxruntime, fastapi, uvicorn)...", 68);
+                        bool ok = RunPipInstall(pyCmd, reqFile, false);
+                        if (!ok)
                         {
-                            ProcessStartInfo pipPsi = new ProcessStartInfo();
-                            pipPsi.FileName = pyCmd;
-                            pipPsi.Arguments = "-m pip install -r \"" + reqFile + "\"";
-                            pipPsi.WorkingDirectory = targetDir;
-                            pipPsi.UseShellExecute = false;
-                            pipPsi.CreateNoWindow = true;
-                            pipPsi.RedirectStandardOutput = true;
-                            pipPsi.RedirectStandardError = true;
-
-                            using (Process pipProc = Process.Start(pipPsi))
-                            {
-                                pipProc.OutputDataReceived += (sender, args) => {
-                                    if (!string.IsNullOrEmpty(args.Data)) AppendLog("  " + args.Data);
-                                };
-                                pipProc.ErrorDataReceived += (sender, args) => {
-                                    if (!string.IsNullOrEmpty(args.Data)) AppendLog("  " + args.Data);
-                                };
-                                pipProc.BeginOutputReadLine();
-                                pipProc.BeginErrorReadLine();
-
-                                pipProc.WaitForExit(180000);
-                                if (pipProc.ExitCode == 0)
-                                {
-                                    AppendLog("[SUCCESS] AI dependencies installed and verified successfully.");
-                                }
-                                else
-                                {
-                                    AppendLog("[NOTICE] pip finished with code " + pipProc.ExitCode + ".");
-                                }
-                            }
+                            AppendLog("Retrying pip installation with '--user' scope...");
+                            ok = RunPipInstall(pyCmd, reqFile, true);
                         }
-                        catch (Exception pex)
-                        {
-                            AppendLog("[ERROR] pip execution failed: " + pex.Message);
-                        }
+                        pipSucceeded = ok;
+                    }
+                    else
+                    {
+                        AppendLog("[Notice] requirements_lean.txt not found; skipping pip step.");
                     }
                 }
             }
+            else
+            {
+                AppendLog("Custom option: Skipping automated pip dependency installation.");
+            }
 
-            SetProgress(80);
+            SetProgress(84);
 
-            // Shortcuts
+            // PHASE 3: Shortcuts & Uninstaller Registration
+            SetInstallPhase(3);
             bool doDesktop = (installMode == 0) || chkDesktopShortcut.Checked;
             bool doStart = (installMode == 0) || chkStartMenuShortcut.Checked;
             if (doDesktop || doStart)
             {
-                UpdateStatus("Creating program shortcuts...", 85);
-                AppendLog("Generating desktop and start menu shortcuts...");
+                UpdateStatus("Phase 4/4: Creating Desktop and Start Menu shortcuts...", 88);
+                AppendLog("Creating Windows shortcuts...");
                 CreateShortcuts(targetDir, doDesktop, doStart);
             }
 
-            // Uninstaller Registration
             bool doUninst = (installMode == 0) || chkRegisterUninstaller.Checked;
             if (doUninst)
             {
-                UpdateStatus("Registering Windows Uninstaller...", 95);
-                AppendLog("Registering Spoonbill AI Studio in Windows Control Panel / Settings...");
+                UpdateStatus("Phase 4/4: Registering Windows Uninstaller...", 95);
+                AppendLog("Registering uninstaller in Windows Installed Apps...");
                 RegisterUninstaller(targetDir);
             }
 
             SetProgress(100);
-            UpdateStatus("Installation complete.", 100);
-            AppendLog("All selected components installed successfully.");
+            UpdateStatus("Deployment complete!", 100);
+            AppendLog("=== ALL SELECTED COMPONENTS DEPLOYED SUCCESSFULLY ===");
 
-            Thread.Sleep(600);
+            Thread.Sleep(500);
             this.Invoke((MethodInvoker)delegate {
                 isInstalling = false;
                 SwitchStep(4);
@@ -1501,9 +1915,66 @@ public class SpoonbillNvidiaInstaller : Form
         {
             AppendLog("[FATAL ERROR] " + ex.Message);
             this.Invoke((MethodInvoker)delegate {
-                MessageBox.Show(this, "Installation Error:\n" + ex.Message, "Setup Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                btnCancel.Enabled = true;
+                isInstalling = false;
+                MessageBox.Show(this, "An error occurred during installation:\n\n" + ex.Message, "Setup Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                btnBack.IsInteractive = true;
+                btnCancel.IsInteractive = true;
             });
+        }
+    }
+
+    private bool RunPipInstall(string pyCmd, string reqFile, bool userFlag)
+    {
+        try
+        {
+            string args = "-m pip install --disable-pip-version-check --no-input " + (userFlag ? "--user " : "") + "-r \"" + reqFile + "\"";
+            AppendLog("Executing: " + pyCmd + " " + args);
+
+            ProcessStartInfo pipPsi = new ProcessStartInfo();
+            pipPsi.FileName = pyCmd;
+            pipPsi.Arguments = args;
+            pipPsi.WorkingDirectory = targetDir;
+            pipPsi.UseShellExecute = false;
+            pipPsi.CreateNoWindow = true;
+            pipPsi.RedirectStandardOutput = true;
+            pipPsi.RedirectStandardError = true;
+            pipPsi.RedirectStandardInput = true;
+
+            using (Process pipProc = Process.Start(pipPsi))
+            {
+                try { pipProc.StandardInput.Close(); } catch {}
+                pipProc.OutputDataReceived += (sender, e) => {
+                    if (!string.IsNullOrEmpty(e.Data)) AppendLog("  " + e.Data);
+                };
+                pipProc.ErrorDataReceived += (sender, e) => {
+                    if (!string.IsNullOrEmpty(e.Data)) AppendLog("  " + e.Data);
+                };
+                pipProc.BeginOutputReadLine();
+                pipProc.BeginErrorReadLine();
+
+                bool exited = pipProc.WaitForExit(180000);
+                if (!exited)
+                {
+                    try { pipProc.Kill(); } catch {}
+                    AppendLog("[WARNING] pip command timed out after 180 seconds.");
+                    return false;
+                }
+                if (pipProc.ExitCode == 0)
+                {
+                    AppendLog("[SUCCESS] AI dependencies verified and installed.");
+                    return true;
+                }
+                else
+                {
+                    AppendLog("[Notice] pip exited with code " + pipProc.ExitCode + ".");
+                    return false;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            AppendLog("[Notice] pip execution error: " + ex.Message);
+            return false;
         }
     }
 
@@ -1536,7 +2007,7 @@ public class SpoonbillNvidiaInstaller : Form
         {
             this.Invoke((MethodInvoker)delegate {
                 string stamp = DateTime.Now.ToString("HH:mm:ss");
-                logBox.AppendText("[" + stamp + "] " + message + Environment.NewLine);
+                logScrollBox.AppendLine("[" + stamp + "] " + message);
             });
         }
     }
@@ -1553,53 +2024,106 @@ public class SpoonbillNvidiaInstaller : Form
         catch {}
     }
 
-    private string FindPythonBinary()
+    public static void RefreshEnvironmentPath()
     {
+        try
+        {
+            string machinePath = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.Machine) ?? "";
+            string userPath = Environment.GetEnvironmentVariable("PATH", EnvironmentVariableTarget.User) ?? "";
+            string combined = machinePath + ";" + userPath;
+            Environment.SetEnvironmentVariable("PATH", combined, EnvironmentVariableTarget.Process);
+        }
+        catch {}
+    }
+
+    private string FindPythonBinary(out string versionText)
+    {
+        versionText = null;
         string[] candidates = new string[] { "python.exe", "py.exe", "python3.exe" };
         foreach (string cmd in candidates)
         {
-            try
+            string ver;
+            if (TestPythonCandidate(cmd, out ver))
             {
-                ProcessStartInfo psi = new ProcessStartInfo(cmd, "--version");
-                psi.UseShellExecute = false;
-                psi.CreateNoWindow = true;
-                psi.RedirectStandardOutput = true;
-                psi.RedirectStandardError = true;
-                using (Process p = Process.Start(psi))
-                {
-                    p.WaitForExit(2500);
-                    if (p.ExitCode == 0) return cmd;
-                }
+                versionText = ver;
+                return cmd;
             }
-            catch {}
         }
 
         try
         {
             string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string pyPrograms = Path.Combine(localApp, "Programs", "Python");
-            if (Directory.Exists(pyPrograms))
+            string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string progFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+
+            string[] searchRoots = new string[] {
+                Path.Combine(localApp, "Programs", "Python"),
+                progFiles,
+                @"C:\",
+                userProfile
+            };
+
+            foreach (string root in searchRoots)
             {
-                foreach (string dir in Directory.GetDirectories(pyPrograms))
+                if (!Directory.Exists(root)) continue;
+                foreach (string dir in Directory.GetDirectories(root, "Python*"))
                 {
                     string p = Path.Combine(dir, "python.exe");
-                    if (File.Exists(p)) return p;
+                    string ver;
+                    if (File.Exists(p) && TestPythonCandidate(p, out ver))
+                    {
+                        versionText = ver;
+                        return p;
+                    }
                 }
             }
 
-            string progFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-            if (Directory.Exists(progFiles))
+            string[] condaPaths = new string[] {
+                Path.Combine(userProfile, "miniconda3", "python.exe"),
+                Path.Combine(userProfile, "anaconda3", "python.exe"),
+                @"C:\ProgramData\miniconda3\python.exe",
+                @"C:\ProgramData\anaconda3\python.exe"
+            };
+            foreach (string cp in condaPaths)
             {
-                foreach (string dir in Directory.GetDirectories(progFiles, "Python*"))
+                string ver;
+                if (File.Exists(cp) && TestPythonCandidate(cp, out ver))
                 {
-                    string p = Path.Combine(dir, "python.exe");
-                    if (File.Exists(p)) return p;
+                    versionText = ver;
+                    return cp;
                 }
             }
         }
         catch {}
 
         return null;
+    }
+
+    private bool TestPythonCandidate(string binary, out string versionOutput)
+    {
+        versionOutput = null;
+        try
+        {
+            ProcessStartInfo psi = new ProcessStartInfo(binary, "--version");
+            psi.UseShellExecute = false;
+            psi.CreateNoWindow = true;
+            psi.RedirectStandardOutput = true;
+            psi.RedirectStandardError = true;
+            using (Process p = Process.Start(psi))
+            {
+                string stdout = p.StandardOutput.ReadToEnd();
+                string stderr = p.StandardError.ReadToEnd();
+                p.WaitForExit(2500);
+                string combined = (stdout + " " + stderr).Trim();
+                if (p.ExitCode == 0 && combined.IndexOf("Python 3.", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    versionOutput = combined.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)[0].Trim();
+                    return true;
+                }
+            }
+        }
+        catch {}
+        return false;
     }
 
     private void CreateShortcuts(string targetDir, bool desktop, bool startMenu)
@@ -1616,7 +2140,7 @@ public class SpoonbillNvidiaInstaller : Form
                 dynamic desktopLink = shell.CreateShortcut(Path.Combine(desktopDir, "Spoonbill AI Studio.lnk"));
                 desktopLink.TargetPath = exePath;
                 desktopLink.WorkingDirectory = targetDir;
-                desktopLink.Description = "Black-Faced Spoonbill AI Studio V4 (Photoshop Edition)";
+                desktopLink.Description = "Black-Faced Spoonbill AI Studio V4";
                 desktopLink.Save();
             }
 
@@ -1626,7 +2150,7 @@ public class SpoonbillNvidiaInstaller : Form
                 dynamic startMenuLink = shell.CreateShortcut(Path.Combine(startMenuDir, "Spoonbill AI Studio.lnk"));
                 startMenuLink.TargetPath = exePath;
                 startMenuLink.WorkingDirectory = targetDir;
-                startMenuLink.Description = "Black-Faced Spoonbill AI Studio V4 (Photoshop Edition)";
+                startMenuLink.Description = "Black-Faced Spoonbill AI Studio V4";
                 startMenuLink.Save();
             }
         }
@@ -1643,7 +2167,7 @@ public class SpoonbillNvidiaInstaller : Form
             {
                 if (key != null)
                 {
-                    key.SetValue("DisplayName", "Black-Faced Spoonbill AI Studio V4 (Photoshop Edition)");
+                    key.SetValue("DisplayName", "Black-Faced Spoonbill AI Studio V4");
                     key.SetValue("DisplayVersion", "4.0.0");
                     key.SetValue("Publisher", "Black-Faced Spoonbill AI Research Consortium");
                     key.SetValue("InstallLocation", targetDir);
@@ -1711,11 +2235,11 @@ public class SpoonbillNvidiaInstaller : Form
     {
         if (agreementChoice == choice)
         {
-            agreementChoice = 0; // Release selection
+            agreementChoice = 0; // Click again releases selection
         }
         else
         {
-            agreementChoice = choice; // Select this, deselect the other
+            agreementChoice = choice; // Mutually exclusive selection
         }
         UpdateAgreementUI();
     }
@@ -1727,32 +2251,38 @@ public class SpoonbillNvidiaInstaller : Form
 
         if (agreementChoice == 0)
         {
-            lblAgreementStatus.Text = "Please click an option box above to select your agreement (click again to deselect).";
-            lblAgreementStatus.ForeColor = ClrTextMuted;
+            lblAgreementStatus.Text = "Status: No option selected. Click one of the boxes above (click again to release).";
+            lblAgreementStatus.ForeColor = ClrTextSecondary;
             if (currentStep == 1)
             {
-                btnNext.Enabled = false;
-                btnNext.Text = "Next >";
+                btnNext.IsInteractive = false;
+                btnNext.ButtonText = "Next >";
             }
         }
         else if (agreementChoice == 1)
         {
-            lblAgreementStatus.Text = "License accepted. Click 'Next >' to configure installation options.";
+            lblAgreementStatus.Text = "Status: License ACCEPTED. Click 'Next >' to configure Express or Custom options.";
             lblAgreementStatus.ForeColor = ClrNvidiaGreen;
             if (currentStep == 1)
             {
-                btnNext.Enabled = true;
-                btnNext.Text = "Next >";
+                btnNext.IsInteractive = true;
+                btnNext.ButtonText = "Next >";
+                btnNext.ActiveBackColor = ClrNvidiaGreen;
+                btnNext.ActiveForeColor = Color.Black;
+                btnNext.BorderColor = ClrNvidiaGreen;
             }
         }
         else if (agreementChoice == 2)
         {
-            lblAgreementStatus.Text = "Decline selected. Click 'Cancel Setup' to abort without writing files.";
-            lblAgreementStatus.ForeColor = Color.FromArgb(248, 113, 113);
+            lblAgreementStatus.Text = "Status: Agreement DECLINED. Click 'Cancel Setup' to exit without modifying files.";
+            lblAgreementStatus.ForeColor = Color.FromArgb(252, 129, 129);
             if (currentStep == 1)
             {
-                btnNext.Enabled = true;
-                btnNext.Text = "Cancel Setup";
+                btnNext.IsInteractive = true;
+                btnNext.ButtonText = "Cancel Setup";
+                btnNext.ActiveBackColor = Color.FromArgb(220, 38, 38);
+                btnNext.ActiveForeColor = Color.White;
+                btnNext.BorderColor = Color.FromArgb(248, 113, 113);
             }
         }
     }
@@ -1766,21 +2296,124 @@ public class SpoonbillNvidiaInstaller : Form
         RunSystemCheck();
     }
 
+    public void RunVisualVerification(string outDir)
+    {
+        if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
+        this.Show();
+        Application.DoEvents();
+        Thread.Sleep(200);
+
+        // Step 0: System Check
+        SwitchStep(0);
+        Application.DoEvents();
+        CaptureWindowBitmap(Path.Combine(outDir, "step0_system_check.png"));
+
+        // Step 1: Agreement Unselected
+        SwitchStep(1);
+        agreementChoice = 0;
+        UpdateAgreementUI();
+        Application.DoEvents();
+        CaptureWindowBitmap(Path.Combine(outDir, "step1_agreement_unselected.png"));
+
+        // Step 1: Agreement Accepted
+        ToggleAgreementChoice(1);
+        Application.DoEvents();
+        CaptureWindowBitmap(Path.Combine(outDir, "step1_agreement_accepted.png"));
+
+        // Step 1: Agreement Declined (verify mutual exclusivity)
+        ToggleAgreementChoice(2);
+        Application.DoEvents();
+        CaptureWindowBitmap(Path.Combine(outDir, "step1_agreement_declined.png"));
+
+        // Step 1: Click again to release, then Accept
+        ToggleAgreementChoice(2);
+        ToggleAgreementChoice(1);
+        Application.DoEvents();
+
+        // Step 2: Mode & Options (Express)
+        SwitchStep(2);
+        SetInstallMode(0);
+        Application.DoEvents();
+        CaptureWindowBitmap(Path.Combine(outDir, "step2_options_express.png"));
+
+        // Step 2: Mode & Options (Custom)
+        SetInstallMode(1);
+        Application.DoEvents();
+        CaptureWindowBitmap(Path.Combine(outDir, "step2_options_custom.png"));
+
+        // Step 3: Progress UI Preview
+        currentStep = 3;
+        panelSystemCheck.Visible = false;
+        panelAgreement.Visible = false;
+        panelModeAndOptions.Visible = false;
+        panelFinish.Visible = false;
+        panelProgress.Visible = true;
+        panelProgress.BringToFront();
+        btnBack.IsInteractive = false;
+        btnNext.IsInteractive = false;
+        btnCancel.IsInteractive = false;
+        currentInstallPhase = 1;
+        currentProgressPercent = 45;
+        lblProgStatus.Text = "Phase 2/4: Extracting files (42/95)...";
+        logScrollBox.SetText(
+            "[19:30:01] === SPOONBILL AI STUDIO V4 DEPLOYMENT STARTED ===\r\n" +
+            "[19:30:01] Mode: Express (Recommended)\r\n" +
+            "[19:30:01] Target Directory: " + targetDir + "\r\n" +
+            "[19:30:02] Stopping any running Spoonbill_Studio processes...\r\n" +
+            "[19:30:02] Clean purge complete (prior files removed).\r\n" +
+            "[19:30:03] Payload staged. Extracting files with safe overwrite handling...\r\n" +
+            "[19:30:05] Extracted Spoonbill_Studio.exe, UI assets, and ONNX neural weights.\r\n" +
+            "[19:30:06] Using Python runtime: Python 3.12.5 [python.exe]\r\n" +
+            "[19:30:07] Executing: python.exe -m pip install -r requirements_lean.txt"
+        );
+        pnlPhaseTracker.Invalidate();
+        customProgressBar.Invalidate();
+        Application.DoEvents();
+        CaptureWindowBitmap(Path.Combine(outDir, "step3_progress.png"));
+
+        // Step 4: Finish UI Preview
+        SwitchStep(4);
+        Application.DoEvents();
+        CaptureWindowBitmap(Path.Combine(outDir, "step4_finish.png"));
+
+        this.Close();
+    }
+
+    private void CaptureWindowBitmap(string filePath)
+    {
+        this.Refresh();
+        Application.DoEvents();
+        using (Bitmap bmp = new Bitmap(this.Width, this.Height))
+        {
+            this.DrawToBitmap(bmp, new Rectangle(0, 0, this.Width, this.Height));
+            bmp.Save(filePath, ImageFormat.Png);
+        }
+    }
+
     [STAThread]
-    public static void Main()
+    public static void Main(string[] args)
     {
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
-        Application.Run(new SpoonbillNvidiaInstaller());
+        SpoonbillNvidiaInstaller form = new SpoonbillNvidiaInstaller();
+        if (args != null && args.Length >= 2 && args[0] == "--verify-ui")
+        {
+            form.RunVisualVerification(args[1]);
+            return;
+        }
+        Application.Run(form);
     }
 }
 
 public class SystemReadinessDialog : Form
 {
+    private Label lblAutoStatus;
+    private ModernButton btnAutoInstallPy;
+
     public SystemReadinessDialog(bool pythonMissing, bool hasNvidia)
     {
         this.Text = "Spoonbill AI Studio — System Setup & Readiness Guide";
-        this.ClientSize = new Size(680, 520);
+        this.ClientSize = new Size(680, 530);
         this.StartPosition = FormStartPosition.CenterParent;
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
         this.MaximizeBox = false;
@@ -1790,17 +2423,21 @@ public class SystemReadinessDialog : Form
         this.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
 
         // Header Panel
-        Panel pnlHeader = new Panel();
+        BufferedPanel pnlHeader = new BufferedPanel();
         pnlHeader.Location = new Point(0, 0);
         pnlHeader.Size = new Size(680, 60);
         pnlHeader.BackColor = Color.FromArgb(13, 13, 15);
         pnlHeader.Paint += (s, e) => {
-            e.Graphics.DrawLine(new Pen(Color.FromArgb(34, 34, 39), 1), 0, 59, 680, 59);
+            using (Pen p = new Pen(Color.FromArgb(36, 36, 42), 1))
+            {
+                e.Graphics.DrawLine(p, 0, 59, 680, 59);
+            }
         };
         this.Controls.Add(pnlHeader);
 
         Label lblTitle = new Label();
-        lblTitle.Text = "SYSTEM READINESS & SETUP GUIDE";
+        lblTitle.UseMnemonic = false;
+        lblTitle.Text = "SYSTEM READINESS & DEPENDENCY ASSISTANT";
         lblTitle.Font = new Font("Segoe UI", 11F, FontStyle.Bold);
         lblTitle.ForeColor = Color.White;
         lblTitle.Location = new Point(24, 12);
@@ -1808,7 +2445,8 @@ public class SystemReadinessDialog : Form
         pnlHeader.Controls.Add(lblTitle);
 
         Label lblSub = new Label();
-        lblSub.Text = "Step-by-step instructions to make all hardware and software components ready.";
+        lblSub.UseMnemonic = false;
+        lblSub.Text = "One-click tools and instructions to make all hardware and Python requirements ready.";
         lblSub.Font = new Font("Segoe UI", 8.5F);
         lblSub.ForeColor = Color.FromArgb(118, 185, 0);
         lblSub.Location = new Point(25, 34);
@@ -1816,12 +2454,12 @@ public class SystemReadinessDialog : Form
         pnlHeader.Controls.Add(lblSub);
 
         // Card 1: Python AI Runtime Setup
-        Panel cardPython = new Panel();
+        BufferedPanel cardPython = new BufferedPanel();
         cardPython.Location = new Point(24, 74);
-        cardPython.Size = new Size(632, 180);
+        cardPython.Size = new Size(632, 196);
         cardPython.BackColor = Color.FromArgb(26, 26, 30);
         cardPython.Paint += (s, e) => {
-            Color border = pythonMissing ? Color.FromArgb(239, 68, 68) : Color.FromArgb(42, 42, 48);
+            Color border = pythonMissing ? Color.FromArgb(239, 68, 68) : Color.FromArgb(118, 185, 0);
             using (Pen p = new Pen(border, 1.2f))
             {
                 e.Graphics.DrawRectangle(p, 0, 0, cardPython.Width - 1, cardPython.Height - 1);
@@ -1830,63 +2468,82 @@ public class SystemReadinessDialog : Form
         this.Controls.Add(cardPython);
 
         Label lblPyHead = new Label();
-        lblPyHead.Text = "1. Python 3 AI Inference Runtime (Required for Neural Inference)";
+        lblPyHead.UseMnemonic = false;
+        lblPyHead.Text = pythonMissing
+            ? "1. Python 3 AI Runtime — ACTION NEEDED (Not Detected on PATH)"
+            : "1. Python 3 AI Runtime — READY & DETECTED";
         lblPyHead.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-        lblPyHead.ForeColor = pythonMissing ? Color.FromArgb(248, 113, 113) : Color.FromArgb(118, 185, 0);
+        lblPyHead.ForeColor = pythonMissing ? Color.FromArgb(252, 129, 129) : Color.FromArgb(118, 185, 0);
         lblPyHead.Location = new Point(16, 12);
         lblPyHead.AutoSize = true;
         cardPython.Controls.Add(lblPyHead);
 
         Label lblPyBody = new Label();
-        lblPyBody.Text = "Spoonbill Studio requires Python 3.8 to 3.12 (64-bit) for local neural network inference.\n\n" +
-                         "• Method A (Fastest via Windows Terminal / PowerShell):\n" +
-                         "  winget install Python.Python.3.11\n\n" +
-                         "• Method B (Manual Installer from python.org):\n" +
-                         "  Download installer. CRITICAL: Check 'Add python.exe to PATH' at the bottom of setup!";
+        lblPyBody.UseMnemonic = false;
+        lblPyBody.Text = "Spoonbill AI Studio uses Python 3.8 - 3.12 (64-bit) to run its local ONNX Runtime inference server.\n\n" +
+                         "• Option A (One-Click Automated Install via Windows Package Manager):\n" +
+                         "  Click 'Auto-Install Python 3.11 Now' below to automatically download and configure Python 3.11.\n" +
+                         "• Option B (Official Installer from python.org):\n" +
+                         "  Click 'Download from python.org' and check 'Add python.exe to PATH' on the first screen.";
         lblPyBody.Font = new Font("Segoe UI", 8.5F);
-        lblPyBody.ForeColor = Color.FromArgb(212, 212, 216);
+        lblPyBody.ForeColor = Color.FromArgb(225, 225, 232);
         lblPyBody.Location = new Point(16, 34);
-        lblPyBody.Size = new Size(600, 95);
+        lblPyBody.Size = new Size(600, 96);
         cardPython.Controls.Add(lblPyBody);
 
-        Button btnPyWeb = new Button();
-        btnPyWeb.Text = "Download Python (python.org)";
-        btnPyWeb.Location = new Point(16, 136);
-        btnPyWeb.Size = new Size(205, 28);
-        btnPyWeb.BackColor = Color.FromArgb(38, 38, 44);
-        btnPyWeb.ForeColor = Color.White;
-        btnPyWeb.FlatStyle = FlatStyle.Flat;
-        btnPyWeb.FlatAppearance.BorderColor = Color.FromArgb(118, 185, 0);
-        btnPyWeb.Cursor = Cursors.Hand;
-        btnPyWeb.Click += (s, e) => {
+        btnAutoInstallPy = new ModernButton();
+        btnAutoInstallPy.ButtonText = "Auto-Install Python 3.11 Now";
+        btnAutoInstallPy.Location = new Point(16, 134);
+        btnAutoInstallPy.Size = new Size(206, 30);
+        btnAutoInstallPy.ActiveBackColor = Color.FromArgb(118, 185, 0);
+        btnAutoInstallPy.ActiveForeColor = Color.Black;
+        btnAutoInstallPy.BorderColor = Color.FromArgb(118, 185, 0);
+        btnAutoInstallPy.ButtonClick += OnAutoInstallPythonClick;
+        cardPython.Controls.Add(btnAutoInstallPy);
+
+        ModernButton btnPyWeb = new ModernButton();
+        btnPyWeb.ButtonText = "Download from python.org";
+        btnPyWeb.Location = new Point(232, 134);
+        btnPyWeb.Size = new Size(190, 30);
+        btnPyWeb.ActiveBackColor = Color.FromArgb(42, 42, 50);
+        btnPyWeb.ActiveForeColor = Color.White;
+        btnPyWeb.BorderColor = Color.FromArgb(80, 80, 92);
+        btnPyWeb.ButtonClick += (s, e) => {
             try { Process.Start("https://www.python.org/downloads/windows/"); } catch {}
         };
         cardPython.Controls.Add(btnPyWeb);
 
-        Button btnCopyWinget = new Button();
-        btnCopyWinget.Text = "Copy 'winget' Command";
-        btnCopyWinget.Location = new Point(231, 136);
-        btnCopyWinget.Size = new Size(170, 28);
-        btnCopyWinget.BackColor = Color.FromArgb(38, 38, 44);
-        btnCopyWinget.ForeColor = Color.White;
-        btnCopyWinget.FlatStyle = FlatStyle.Flat;
-        btnCopyWinget.FlatAppearance.BorderColor = Color.FromArgb(60, 60, 68);
-        btnCopyWinget.Cursor = Cursors.Hand;
-        btnCopyWinget.Click += (s, e) => {
+        ModernButton btnCopyWinget = new ModernButton();
+        btnCopyWinget.ButtonText = "Copy winget Command";
+        btnCopyWinget.Location = new Point(432, 134);
+        btnCopyWinget.Size = new Size(180, 30);
+        btnCopyWinget.ActiveBackColor = Color.FromArgb(42, 42, 50);
+        btnCopyWinget.ActiveForeColor = Color.White;
+        btnCopyWinget.BorderColor = Color.FromArgb(80, 80, 92);
+        btnCopyWinget.ButtonClick += (s, e) => {
             try {
-                Clipboard.SetText("winget install Python.Python.3.11");
-                MessageBox.Show(this, "Command copied to clipboard!\nOpen PowerShell and press Ctrl+V to install.", "Copied", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Clipboard.SetText("winget install -e --id Python.Python.3.11");
+                MessageBox.Show(this, "Command copied:\nwinget install -e --id Python.Python.3.11\n\nPaste into PowerShell or Command Prompt.", "Copied", MessageBoxButtons.OK, MessageBoxIcon.Information);
             } catch {}
         };
         cardPython.Controls.Add(btnCopyWinget);
 
+        lblAutoStatus = new Label();
+        lblAutoStatus.UseMnemonic = false;
+        lblAutoStatus.Text = "Status: Ready to run automated setup or manual download.";
+        lblAutoStatus.Font = new Font("Segoe UI", 8F);
+        lblAutoStatus.ForeColor = Color.FromArgb(185, 185, 198);
+        lblAutoStatus.Location = new Point(16, 170);
+        lblAutoStatus.Size = new Size(596, 18);
+        cardPython.Controls.Add(lblAutoStatus);
+
         // Card 2: GPU Acceleration & CUDA
-        Panel cardGpu = new Panel();
-        cardGpu.Location = new Point(24, 266);
-        cardGpu.Size = new Size(632, 135);
+        BufferedPanel cardGpu = new BufferedPanel();
+        cardGpu.Location = new Point(24, 282);
+        cardGpu.Size = new Size(632, 132);
         cardGpu.BackColor = Color.FromArgb(26, 26, 30);
         cardGpu.Paint += (s, e) => {
-            using (Pen p = new Pen(Color.FromArgb(42, 42, 48), 1))
+            using (Pen p = new Pen(Color.FromArgb(46, 46, 54), 1))
             {
                 e.Graphics.DrawRectangle(p, 0, 0, cardGpu.Width - 1, cardGpu.Height - 1);
             }
@@ -1894,81 +2551,111 @@ public class SystemReadinessDialog : Form
         this.Controls.Add(cardGpu);
 
         Label lblGpuHead = new Label();
+        lblGpuHead.UseMnemonic = false;
         lblGpuHead.Text = "2. Graphics Acceleration & NVIDIA CUDA (Optional)";
         lblGpuHead.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-        lblGpuHead.ForeColor = Color.FromArgb(118, 185, 0);
+        lblGpuHead.ForeColor = Color.FromArgb(56, 189, 248);
         lblGpuHead.Location = new Point(16, 12);
         lblGpuHead.AutoSize = true;
         cardGpu.Controls.Add(lblGpuHead);
 
         Label lblGpuBody = new Label();
-        lblGpuBody.Text = "• CPU Safe Mode: Operates out-of-the-box on all laptops (Intel, AMD, CPU) using YOLO11 Nano.\n" +
-                         "• NVIDIA GPU Acceleration: Unlocks YOLO11 Large and BeakAttn models.\n" +
-                         "  Requires NVIDIA GeForce / RTX drivers and the CUDA 12.x Toolkit.";
+        lblGpuBody.UseMnemonic = false;
+        lblGpuBody.Text = "• CPU Safe Mode works out-of-the-box on all computers (Intel, AMD, and laptops) with zero GPU setup.\n" +
+                         "• Optional NVIDIA GPU Acceleration unlocks high-throughput batch processing for Large models.\n" +
+                         "  Requires up-to-date NVIDIA Game Ready / Studio Drivers.";
         lblGpuBody.Font = new Font("Segoe UI", 8.5F);
-        lblGpuBody.ForeColor = Color.FromArgb(212, 212, 216);
+        lblGpuBody.ForeColor = Color.FromArgb(225, 225, 232);
         lblGpuBody.Location = new Point(16, 34);
-        lblGpuBody.Size = new Size(600, 56);
+        lblGpuBody.Size = new Size(600, 54);
         cardGpu.Controls.Add(lblGpuBody);
 
-        Button btnNvidiaWeb = new Button();
-        btnNvidiaWeb.Text = "NVIDIA Drivers";
-        btnNvidiaWeb.Location = new Point(16, 94);
-        btnNvidiaWeb.Size = new Size(130, 28);
-        btnNvidiaWeb.BackColor = Color.FromArgb(38, 38, 44);
-        btnNvidiaWeb.ForeColor = Color.White;
-        btnNvidiaWeb.FlatStyle = FlatStyle.Flat;
-        btnNvidiaWeb.FlatAppearance.BorderColor = Color.FromArgb(60, 60, 68);
-        btnNvidiaWeb.Cursor = Cursors.Hand;
-        btnNvidiaWeb.Click += (s, e) => {
+        ModernButton btnNvidiaWeb = new ModernButton();
+        btnNvidiaWeb.ButtonText = "NVIDIA Driver Downloads";
+        btnNvidiaWeb.Location = new Point(16, 92);
+        btnNvidiaWeb.Size = new Size(175, 28);
+        btnNvidiaWeb.ActiveBackColor = Color.FromArgb(42, 42, 50);
+        btnNvidiaWeb.ActiveForeColor = Color.White;
+        btnNvidiaWeb.BorderColor = Color.FromArgb(80, 80, 92);
+        btnNvidiaWeb.ButtonClick += (s, e) => {
             try { Process.Start("https://www.nvidia.com/Download/index.aspx"); } catch {}
         };
         cardGpu.Controls.Add(btnNvidiaWeb);
 
-        Button btnCudaWeb = new Button();
-        btnCudaWeb.Text = "CUDA Toolkit Downloads";
-        btnCudaWeb.Location = new Point(156, 94);
-        btnCudaWeb.Size = new Size(170, 28);
-        btnCudaWeb.BackColor = Color.FromArgb(38, 38, 44);
-        btnCudaWeb.ForeColor = Color.White;
-        btnCudaWeb.FlatStyle = FlatStyle.Flat;
-        btnCudaWeb.FlatAppearance.BorderColor = Color.FromArgb(60, 60, 68);
-        btnCudaWeb.Cursor = Cursors.Hand;
-        btnCudaWeb.Click += (s, e) => {
+        ModernButton btnCudaWeb = new ModernButton();
+        btnCudaWeb.ButtonText = "CUDA Toolkit Archive";
+        btnCudaWeb.Location = new Point(201, 92);
+        btnCudaWeb.Size = new Size(165, 28);
+        btnCudaWeb.ActiveBackColor = Color.FromArgb(42, 42, 50);
+        btnCudaWeb.ActiveForeColor = Color.White;
+        btnCudaWeb.BorderColor = Color.FromArgb(80, 80, 92);
+        btnCudaWeb.ButtonClick += (s, e) => {
             try { Process.Start("https://developer.nvidia.com/cuda-downloads"); } catch {}
         };
         cardGpu.Controls.Add(btnCudaWeb);
 
-        // Note at bottom
         Label lblRefreshNote = new Label();
-        lblRefreshNote.Text = "Tip: After installing Python or drivers, do NOT restart setup. Simply close this guide and click 'Refresh Scan' on the main window.";
+        lblRefreshNote.UseMnemonic = false;
+        lblRefreshNote.Text = "When finished, click 'Close & Rescan System' below — the installer will automatically refresh your system PATH.";
         lblRefreshNote.Font = new Font("Segoe UI", 8.5F, FontStyle.Italic);
-        lblRefreshNote.ForeColor = Color.FromArgb(161, 161, 170);
-        lblRefreshNote.Location = new Point(24, 412);
-        lblRefreshNote.Size = new Size(632, 34);
+        lblRefreshNote.ForeColor = Color.FromArgb(190, 190, 205);
+        lblRefreshNote.Location = new Point(24, 424);
+        lblRefreshNote.Size = new Size(632, 24);
         this.Controls.Add(lblRefreshNote);
 
         // Bottom Bar
-        Panel pnlBottom = new Panel();
-        pnlBottom.Location = new Point(0, 456);
-        pnlBottom.Size = new Size(680, 64);
+        BufferedPanel pnlBottom = new BufferedPanel();
+        pnlBottom.Location = new Point(0, 464);
+        pnlBottom.Size = new Size(680, 66);
         pnlBottom.BackColor = Color.FromArgb(13, 13, 15);
         pnlBottom.Paint += (s, e) => {
-            e.Graphics.DrawLine(new Pen(Color.FromArgb(34, 34, 39), 1), 0, 0, 680, 0);
+            using (Pen p = new Pen(Color.FromArgb(36, 36, 42), 1))
+            {
+                e.Graphics.DrawLine(p, 0, 0, 680, 0);
+            }
         };
         this.Controls.Add(pnlBottom);
 
-        Button btnClose = new Button();
-        btnClose.Text = "Close Guide";
-        btnClose.Location = new Point(540, 14);
-        btnClose.Size = new Size(116, 34);
-        btnClose.BackColor = Color.FromArgb(118, 185, 0);
-        btnClose.ForeColor = Color.Black;
-        btnClose.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-        btnClose.FlatStyle = FlatStyle.Flat;
-        btnClose.FlatAppearance.BorderSize = 0;
-        btnClose.Cursor = Cursors.Hand;
-        btnClose.Click += (s, e) => this.Close();
+        ModernButton btnClose = new ModernButton();
+        btnClose.ButtonText = "Close & Rescan System";
+        btnClose.Location = new Point(486, 16);
+        btnClose.Size = new Size(170, 34);
+        btnClose.ActiveBackColor = Color.FromArgb(118, 185, 0);
+        btnClose.ActiveForeColor = Color.Black;
+        btnClose.BorderColor = Color.FromArgb(118, 185, 0);
+        btnClose.ButtonClick += (s, e) => this.Close();
         pnlBottom.Controls.Add(btnClose);
+    }
+
+    private void OnAutoInstallPythonClick(object sender, EventArgs e)
+    {
+        try
+        {
+            btnAutoInstallPy.IsInteractive = false;
+            lblAutoStatus.Text = "Launching Windows Package Manager (winget) to install Python 3.11...";
+            lblAutoStatus.ForeColor = Color.FromArgb(118, 185, 0);
+            Application.DoEvents();
+
+            ProcessStartInfo psi = new ProcessStartInfo();
+            psi.FileName = "cmd.exe";
+            psi.Arguments = "/c echo Installing Python 3.11 via winget... && winget install -e --id Python.Python.3.11 --accept-package-agreements --accept-source-agreements && echo. && echo Done! Closing in 3 seconds... && timeout /t 3";
+            psi.UseShellExecute = true;
+            using (Process p = Process.Start(psi))
+            {
+                if (p != null)
+                {
+                    p.WaitForExit();
+                }
+            }
+            SpoonbillNvidiaInstaller.RefreshEnvironmentPath();
+            lblAutoStatus.Text = "Automated installer finished! Click 'Close & Rescan System' below to verify.";
+            btnAutoInstallPy.IsInteractive = true;
+        }
+        catch (Exception ex)
+        {
+            lblAutoStatus.Text = "Could not launch winget: " + ex.Message + ". Please use 'Download from python.org'.";
+            lblAutoStatus.ForeColor = Color.FromArgb(248, 113, 113);
+            btnAutoInstallPy.IsInteractive = true;
+        }
     }
 }

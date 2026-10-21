@@ -2,42 +2,247 @@ using System;
 using System.IO;
 using System.Windows.Forms;
 using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Diagnostics;
 using System.Threading;
 using Microsoft.Win32;
 
+public class BufferedPanel : Panel
+{
+    public BufferedPanel()
+    {
+        this.DoubleBuffered = true;
+        this.SetStyle(
+            ControlStyles.AllPaintingInWmPaint |
+            ControlStyles.UserPaint |
+            ControlStyles.OptimizedDoubleBuffer |
+            ControlStyles.ResizeRedraw,
+            true
+        );
+        this.UpdateStyles();
+    }
+}
+
+public class ModernButton : BufferedPanel
+{
+    private string buttonText = "";
+    private Color activeBack = Color.FromArgb(44, 44, 52);
+    private Color activeFore = Color.White;
+    private Color borderColor = Color.FromArgb(76, 76, 88);
+    private Font textFont = new Font("Segoe UI", 8.75F, FontStyle.Bold);
+    private bool isInteractive = true;
+    private bool isHovered = false;
+    public event EventHandler ButtonClick;
+
+    public string ButtonText
+    {
+        get { return buttonText; }
+        set { buttonText = value; this.Invalidate(); }
+    }
+
+    public Color ActiveBackColor
+    {
+        get { return activeBack; }
+        set { activeBack = value; this.Invalidate(); }
+    }
+
+    public Color ActiveForeColor
+    {
+        get { return activeFore; }
+        set { activeFore = value; this.Invalidate(); }
+    }
+
+    public Color BorderColor
+    {
+        get { return borderColor; }
+        set { borderColor = value; this.Invalidate(); }
+    }
+
+    public Font TextFont
+    {
+        get { return textFont; }
+        set { textFont = value; this.Invalidate(); }
+    }
+
+    public bool IsInteractive
+    {
+        get { return isInteractive; }
+        set
+        {
+            isInteractive = value;
+            this.Cursor = isInteractive ? Cursors.Hand : Cursors.Default;
+            this.Invalidate();
+        }
+    }
+
+    public ModernButton()
+    {
+        this.Cursor = Cursors.Hand;
+        this.MouseEnter += (s, e) => { isHovered = true; this.Invalidate(); };
+        this.MouseLeave += (s, e) => { isHovered = false; this.Invalidate(); };
+        this.MouseDown += (s, e) => {
+            if (isInteractive && e.Button == MouseButtons.Left && ButtonClick != null)
+            {
+                ButtonClick(this, EventArgs.Empty);
+            }
+        };
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+        e.Graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.ClearTypeGridFit;
+
+        Color bg = isInteractive ? activeBack : Color.FromArgb(26, 26, 32);
+        if (isInteractive && isHovered)
+        {
+            int r = Math.Min(255, bg.R + 18);
+            int g = Math.Min(255, bg.G + 18);
+            int b = Math.Min(255, bg.B + 18);
+            bg = Color.FromArgb(r, g, b);
+        }
+        Color fg = isInteractive ? activeFore : Color.FromArgb(145, 145, 160);
+        Color bd = isInteractive ? borderColor : Color.FromArgb(52, 52, 62);
+
+        using (SolidBrush sb = new SolidBrush(bg))
+        {
+            e.Graphics.FillRectangle(sb, 0, 0, this.Width, this.Height);
+        }
+        if (bd != Color.Empty && bd.A > 0)
+        {
+            using (Pen p = new Pen(bd, 1f))
+            {
+                e.Graphics.DrawRectangle(p, 0, 0, this.Width - 1, this.Height - 1);
+            }
+        }
+        using (Brush tb = new SolidBrush(fg))
+        {
+            StringFormat sf = new StringFormat();
+            sf.Alignment = StringAlignment.Center;
+            sf.LineAlignment = StringAlignment.Center;
+            e.Graphics.DrawString(buttonText, textFont, tb, new RectangleF(0, 0, this.Width, this.Height), sf);
+        }
+    }
+}
+
+public class ScrollTextPanel : BufferedPanel
+{
+    private Panel innerScroll;
+    private Label lblContent;
+    private Label bottomAnchor;
+
+    public ScrollTextPanel(int width, int height)
+    {
+        this.Size = new Size(width, height);
+        this.BackColor = Color.FromArgb(14, 14, 18);
+
+        innerScroll = new Panel();
+        innerScroll.Location = new Point(2, 2);
+        innerScroll.Size = new Size(width - 4, height - 4);
+        innerScroll.BackColor = Color.FromArgb(14, 14, 18);
+        innerScroll.AutoScroll = true;
+        this.Controls.Add(innerScroll);
+
+        lblContent = new Label();
+        lblContent.Location = new Point(10, 8);
+        lblContent.AutoSize = true;
+        lblContent.MaximumSize = new Size(width - 36, 0);
+        lblContent.BackColor = Color.FromArgb(14, 14, 18);
+        lblContent.ForeColor = Color.FromArgb(236, 236, 244);
+        lblContent.Font = new Font("Consolas", 8.5F, FontStyle.Regular);
+        lblContent.UseMnemonic = false;
+        innerScroll.Controls.Add(lblContent);
+
+        bottomAnchor = new Label();
+        bottomAnchor.Size = new Size(1, 4);
+        bottomAnchor.Location = new Point(10, 20);
+        innerScroll.Controls.Add(bottomAnchor);
+    }
+
+    public void SetText(string text)
+    {
+        lblContent.Text = text;
+        bottomAnchor.Location = new Point(10, lblContent.Bottom + 4);
+    }
+
+    public void AppendLine(string line)
+    {
+        if (string.IsNullOrEmpty(lblContent.Text))
+        {
+            lblContent.Text = line;
+        }
+        else
+        {
+            lblContent.Text = lblContent.Text + Environment.NewLine + line;
+        }
+        bottomAnchor.Location = new Point(10, lblContent.Bottom + 4);
+        try
+        {
+            innerScroll.ScrollControlIntoView(bottomAnchor);
+        }
+        catch {}
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        base.OnPaint(e);
+        using (Pen p = new Pen(Color.FromArgb(52, 52, 62), 1))
+        {
+            e.Graphics.DrawRectangle(p, 0, 0, this.Width - 1, this.Height - 1);
+        }
+    }
+}
+
 public class SpoonbillUninstaller : Form
 {
-    private Panel sidebarPanel;
-    private Panel contentPanel;
-    private Panel bottomPanel;
+    private const int FormWidth = 680;
+    private const int FormHeight = 420;
+    private const int SidebarWidth = 200;
+    private const int ContentWidth = 480;
+    private const int MainHeight = 362;
+    private const int BottomHeight = 58;
 
-    private Label brandTitle;
-    private Label brandSub;
+    private BufferedPanel sidebarPanel;
+    private BufferedPanel contentPanel;
+    private BufferedPanel bottomPanel;
+
     private Label[] stepLabels;
     private int currentStep = 0;
 
     // Content controls
     private Label titleHeader;
     private Label descLabel;
-    private ProgressBar progressBar;
-    private RichTextBox logBox;
-    private Button btnAction;
-    private Button btnCancel;
+    private BufferedPanel targetCard;
+    private Label lblTargetValue;
+    private BufferedPanel customProgressBar;
+    private int currentProgressPercent = 0;
+    private ScrollTextPanel logScrollBox;
+    private ModernButton btnAction;
+    private ModernButton btnCancel;
 
     private string targetDir;
+
+    private readonly Color ClrBgDark = Color.FromArgb(19, 19, 22);
+    private readonly Color ClrSidebar = Color.FromArgb(13, 13, 15);
+    private readonly Color ClrCardBg = Color.FromArgb(26, 26, 30);
+    private readonly Color ClrCardBorder = Color.FromArgb(46, 46, 54);
+    private readonly Color ClrNvidiaGreen = Color.FromArgb(118, 185, 0);
+    private readonly Color ClrTextPrimary = Color.FromArgb(244, 244, 246);
+    private readonly Color ClrTextSecondary = Color.FromArgb(195, 195, 205);
 
     public SpoonbillUninstaller(string installDir)
     {
         this.targetDir = installDir;
         this.Text = "Spoonbill AI Studio V4 — Uninstaller";
-        this.Size = new Size(640, 420);
+        this.ClientSize = new Size(FormWidth, FormHeight);
         this.StartPosition = FormStartPosition.CenterScreen;
         this.FormBorderStyle = FormBorderStyle.FixedDialog;
         this.MaximizeBox = false;
-        this.BackColor = Color.FromArgb(27, 27, 30);
-        this.ForeColor = Color.FromArgb(228, 228, 231);
+        this.BackColor = ClrBgDark;
+        this.ForeColor = ClrTextPrimary;
         this.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
+        this.DoubleBuffered = true;
 
         InitializeLayout();
         ShowStep(0);
@@ -45,121 +250,170 @@ public class SpoonbillUninstaller : Form
 
     private void InitializeLayout()
     {
-        // 1. Sidebar (NVIDIA Dark Style)
-        sidebarPanel = new Panel();
-        sidebarPanel.Dock = DockStyle.Left;
-        sidebarPanel.Width = 190;
-        sidebarPanel.BackColor = Color.FromArgb(18, 18, 20);
+        // 1. Sidebar (Explicit Left Column: X = 0, Width = 200)
+        sidebarPanel = new BufferedPanel();
+        sidebarPanel.Location = new Point(0, 0);
+        sidebarPanel.Size = new Size(SidebarWidth, MainHeight);
+        sidebarPanel.BackColor = ClrSidebar;
+        sidebarPanel.Paint += (s, e) => {
+            using (Pen p = new Pen(Color.FromArgb(36, 36, 42), 1))
+            {
+                e.Graphics.DrawLine(p, SidebarWidth - 1, 0, SidebarWidth - 1, MainHeight);
+            }
+        };
         this.Controls.Add(sidebarPanel);
 
-        brandTitle = new Label();
+        Label brandTitle = new Label();
+        brandTitle.UseMnemonic = false;
         brandTitle.Text = "SPOONBILL AI";
-        brandTitle.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-        brandTitle.ForeColor = Color.FromArgb(118, 185, 0); // NVIDIA signature green
-        brandTitle.Location = new Point(20, 24);
+        brandTitle.Font = new Font("Segoe UI", 11.5F, FontStyle.Bold);
+        brandTitle.ForeColor = ClrNvidiaGreen;
+        brandTitle.Location = new Point(22, 22);
         brandTitle.AutoSize = true;
         sidebarPanel.Controls.Add(brandTitle);
 
-        brandSub = new Label();
-        brandSub.Text = "Studio Uninstaller";
-        brandSub.Font = new Font("Segoe UI", 8F, FontStyle.Regular);
-        brandSub.ForeColor = Color.FromArgb(161, 161, 170);
-        brandSub.Location = new Point(21, 46);
+        Label brandSub = new Label();
+        brandSub.UseMnemonic = false;
+        brandSub.Text = "Studio Uninstaller V4";
+        brandSub.Font = new Font("Segoe UI", 8.25F, FontStyle.Regular);
+        brandSub.ForeColor = ClrTextSecondary;
+        brandSub.Location = new Point(23, 44);
         brandSub.AutoSize = true;
         sidebarPanel.Controls.Add(brandSub);
 
         string[] steps = new string[] {
             "1. Confirm Removal",
             "2. Uninstallation",
-            "3. Finish"
+            "3. Complete"
         };
         stepLabels = new Label[steps.Length];
         for (int i = 0; i < steps.Length; i++)
         {
             Label lbl = new Label();
+            lbl.UseMnemonic = false;
             lbl.Text = steps[i];
-            lbl.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
-            lbl.ForeColor = Color.FromArgb(113, 113, 122);
-            lbl.Location = new Point(24, 100 + (i * 36));
-            lbl.Size = new Size(150, 24);
+            lbl.Font = new Font("Segoe UI", 9.25F, FontStyle.Regular);
+            lbl.ForeColor = Color.FromArgb(140, 140, 152);
+            lbl.Location = new Point(22, 96 + (i * 38));
+            lbl.Size = new Size(165, 24);
             sidebarPanel.Controls.Add(lbl);
             stepLabels[i] = lbl;
         }
 
-        // 2. Bottom Navigation Bar
-        bottomPanel = new Panel();
-        bottomPanel.Dock = DockStyle.Bottom;
-        bottomPanel.Height = 54;
-        bottomPanel.BackColor = Color.FromArgb(22, 22, 25);
-        bottomPanel.Paint += (s, e) => {
-            e.Graphics.DrawLine(new Pen(Color.FromArgb(39, 39, 42)), 0, 0, bottomPanel.Width, 0);
-        };
-        this.Controls.Add(bottomPanel);
-
-        btnAction = new Button();
-        btnAction.Text = "Uninstall";
-        btnAction.Size = new Size(96, 32);
-        btnAction.Location = new Point(415, 11);
-        btnAction.BackColor = Color.FromArgb(118, 185, 0);
-        btnAction.ForeColor = Color.Black;
-        btnAction.FlatStyle = FlatStyle.Flat;
-        btnAction.FlatAppearance.BorderSize = 0;
-        btnAction.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
-        btnAction.Click += OnActionClick;
-        bottomPanel.Controls.Add(btnAction);
-
-        btnCancel = new Button();
-        btnCancel.Text = "Cancel";
-        btnCancel.Size = new Size(84, 32);
-        btnCancel.Location = new Point(520, 11);
-        btnCancel.BackColor = Color.FromArgb(39, 39, 42);
-        btnCancel.ForeColor = Color.FromArgb(228, 228, 231);
-        btnCancel.FlatStyle = FlatStyle.Flat;
-        btnCancel.FlatAppearance.BorderSize = 0;
-        btnCancel.Click += (s, e) => this.Close();
-        bottomPanel.Controls.Add(btnCancel);
-
-        // 3. Content Panel
-        contentPanel = new Panel();
-        contentPanel.Dock = DockStyle.Fill;
-        contentPanel.Padding = new Padding(30, 25, 30, 15);
+        // 2. Main Content Panel (Explicit Right Column: X = 200, Width = 480)
+        contentPanel = new BufferedPanel();
+        contentPanel.Location = new Point(SidebarWidth, 0);
+        contentPanel.Size = new Size(ContentWidth, MainHeight);
+        contentPanel.BackColor = ClrBgDark;
         this.Controls.Add(contentPanel);
 
         titleHeader = new Label();
+        titleHeader.UseMnemonic = false;
         titleHeader.Text = "Uninstall Spoonbill AI Studio";
         titleHeader.Font = new Font("Segoe UI", 13F, FontStyle.Bold);
         titleHeader.ForeColor = Color.White;
-        titleHeader.Location = new Point(30, 24);
-        titleHeader.Size = new Size(380, 30);
+        titleHeader.Location = new Point(26, 20);
+        titleHeader.Size = new Size(428, 28);
         contentPanel.Controls.Add(titleHeader);
 
         descLabel = new Label();
-        descLabel.Text = "This wizard will completely remove Spoonbill AI Studio V4 and all associated shortcuts from your computer.";
+        descLabel.UseMnemonic = false;
+        descLabel.Text = "This wizard will cleanly remove Spoonbill AI Studio V4, shortcuts, and registry entries from your computer.";
         descLabel.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
-        descLabel.ForeColor = Color.FromArgb(161, 161, 170);
-        descLabel.Location = new Point(32, 62);
-        descLabel.Size = new Size(380, 50);
+        descLabel.ForeColor = ClrTextSecondary;
+        descLabel.Location = new Point(26, 52);
+        descLabel.Size = new Size(428, 40);
         contentPanel.Controls.Add(descLabel);
 
-        progressBar = new ProgressBar();
-        progressBar.Location = new Point(32, 120);
-        progressBar.Size = new Size(375, 14);
-        progressBar.Style = ProgressBarStyle.Continuous;
-        progressBar.Visible = false;
-        contentPanel.Controls.Add(progressBar);
+        targetCard = new BufferedPanel();
+        targetCard.Location = new Point(26, 100);
+        targetCard.Size = new Size(428, 66);
+        targetCard.BackColor = ClrCardBg;
+        targetCard.Paint += (s, e) => {
+            using (Pen p = new Pen(ClrCardBorder, 1))
+            {
+                e.Graphics.DrawRectangle(p, 0, 0, targetCard.Width - 1, targetCard.Height - 1);
+            }
+        };
+        contentPanel.Controls.Add(targetCard);
 
-        logBox = new RichTextBox();
-        logBox.Multiline = true;
-        logBox.ReadOnly = true;
-        logBox.ScrollBars = RichTextBoxScrollBars.Vertical;
-        logBox.BackColor = Color.FromArgb(18, 18, 20);
-        logBox.ForeColor = Color.FromArgb(220, 220, 230);
-        logBox.Font = new Font("Consolas", 8.5F, FontStyle.Regular);
-        logBox.Location = new Point(32, 145);
-        logBox.Size = new Size(375, 150);
-        logBox.BorderStyle = BorderStyle.None;
-        logBox.Visible = false;
-        contentPanel.Controls.Add(logBox);
+        Label lblTargetHead = new Label();
+        lblTargetHead.UseMnemonic = false;
+        lblTargetHead.Text = "Target Installation Directory to Remove:";
+        lblTargetHead.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
+        lblTargetHead.ForeColor = ClrNvidiaGreen;
+        lblTargetHead.Location = new Point(14, 10);
+        lblTargetHead.AutoSize = true;
+        targetCard.Controls.Add(lblTargetHead);
+
+        lblTargetValue = new Label();
+        lblTargetValue.UseMnemonic = false;
+        lblTargetValue.Text = targetDir;
+        lblTargetValue.Font = new Font("Consolas", 8.5F, FontStyle.Regular);
+        lblTargetValue.ForeColor = Color.White;
+        lblTargetValue.Location = new Point(14, 32);
+        lblTargetValue.Size = new Size(400, 22);
+        lblTargetValue.AutoEllipsis = true;
+        targetCard.Controls.Add(lblTargetValue);
+
+        customProgressBar = new BufferedPanel();
+        customProgressBar.Location = new Point(26, 104);
+        customProgressBar.Size = new Size(428, 12);
+        customProgressBar.BackColor = Color.FromArgb(32, 32, 38);
+        customProgressBar.Visible = false;
+        customProgressBar.Paint += (s, e) => {
+            int fillW = (int)((currentProgressPercent / 100.0) * customProgressBar.Width);
+            if (fillW > 0)
+            {
+                using (SolidBrush b = new SolidBrush(ClrNvidiaGreen))
+                {
+                    e.Graphics.FillRectangle(b, 0, 0, fillW, customProgressBar.Height);
+                }
+            }
+            using (Pen p = new Pen(ClrCardBorder, 1))
+            {
+                e.Graphics.DrawRectangle(p, 0, 0, customProgressBar.Width - 1, customProgressBar.Height - 1);
+            }
+        };
+        contentPanel.Controls.Add(customProgressBar);
+
+        logScrollBox = new ScrollTextPanel(428, 210);
+        logScrollBox.Location = new Point(26, 126);
+        logScrollBox.Visible = false;
+        contentPanel.Controls.Add(logScrollBox);
+
+        // 3. Bottom Navigation Bar (Explicit Bottom Bar: Y = 362, Height = 58)
+        bottomPanel = new BufferedPanel();
+        bottomPanel.Location = new Point(0, MainHeight);
+        bottomPanel.Size = new Size(FormWidth, BottomHeight);
+        bottomPanel.BackColor = ClrSidebar;
+        bottomPanel.Paint += (s, e) => {
+            using (Pen p = new Pen(Color.FromArgb(36, 36, 42), 1))
+            {
+                e.Graphics.DrawLine(p, 0, 0, FormWidth, 0);
+            }
+        };
+        this.Controls.Add(bottomPanel);
+
+        btnAction = new ModernButton();
+        btnAction.ButtonText = "Uninstall";
+        btnAction.Size = new Size(106, 34);
+        btnAction.Location = new Point(450, 12);
+        btnAction.ActiveBackColor = Color.FromArgb(220, 38, 38);
+        btnAction.ActiveForeColor = Color.White;
+        btnAction.BorderColor = Color.FromArgb(248, 113, 113);
+        btnAction.ButtonClick += OnActionClick;
+        bottomPanel.Controls.Add(btnAction);
+
+        btnCancel = new ModernButton();
+        btnCancel.ButtonText = "Cancel";
+        btnCancel.Size = new Size(92, 34);
+        btnCancel.Location = new Point(564, 12);
+        btnCancel.ActiveBackColor = Color.FromArgb(40, 40, 48);
+        btnCancel.ActiveForeColor = ClrTextSecondary;
+        btnCancel.BorderColor = Color.FromArgb(72, 72, 84);
+        btnCancel.ButtonClick += (s, e) => this.Close();
+        bottomPanel.Controls.Add(btnCancel);
     }
 
     private void ShowStep(int step)
@@ -169,50 +423,61 @@ public class SpoonbillUninstaller : Form
         {
             if (i == step)
             {
-                stepLabels[i].ForeColor = Color.FromArgb(118, 185, 0);
-                stepLabels[i].Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+                stepLabels[i].ForeColor = ClrNvidiaGreen;
+                stepLabels[i].Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
             }
             else if (i < step)
             {
-                stepLabels[i].ForeColor = Color.FromArgb(228, 228, 231);
-                stepLabels[i].Font = new Font("Segoe UI", 9F, FontStyle.Regular);
+                stepLabels[i].ForeColor = Color.White;
+                stepLabels[i].Font = new Font("Segoe UI", 9.25F, FontStyle.Regular);
             }
             else
             {
-                stepLabels[i].ForeColor = Color.FromArgb(113, 113, 122);
-                stepLabels[i].Font = new Font("Segoe UI", 9F, FontStyle.Regular);
+                stepLabels[i].ForeColor = Color.FromArgb(135, 135, 148);
+                stepLabels[i].Font = new Font("Segoe UI", 9.25F, FontStyle.Regular);
             }
         }
 
         if (step == 0)
         {
             titleHeader.Text = "Confirm Removal";
-            descLabel.Text = "Are you sure you want to uninstall Spoonbill AI Studio V4?\n\nTarget directory:\n" + targetDir;
-            progressBar.Visible = false;
-            logBox.Visible = false;
-            btnAction.Text = "Uninstall";
-            btnAction.Enabled = true;
-            btnCancel.Enabled = true;
+            descLabel.Text = "Are you sure you want to completely remove Spoonbill AI Studio V4 and its shortcuts from your computer?";
+            targetCard.Visible = true;
+            customProgressBar.Visible = false;
+            logScrollBox.Visible = false;
+            btnAction.ButtonText = "Uninstall";
+            btnAction.ActiveBackColor = Color.FromArgb(220, 38, 38);
+            btnAction.ActiveForeColor = Color.White;
+            btnAction.BorderColor = Color.FromArgb(248, 113, 113);
+            btnAction.IsInteractive = true;
+            btnCancel.IsInteractive = true;
         }
         else if (step == 1)
         {
             titleHeader.Text = "Uninstalling Spoonbill AI Studio...";
-            descLabel.Text = "Removing installed components, shortcuts, and registry entries.";
-            progressBar.Visible = true;
-            progressBar.Value = 10;
-            logBox.Visible = true;
-            btnAction.Enabled = false;
-            btnCancel.Enabled = false;
+            descLabel.Text = "Stopping active processes and removing files, shortcuts, and registry keys.";
+            targetCard.Visible = false;
+            customProgressBar.Visible = true;
+            currentProgressPercent = 10;
+            customProgressBar.Invalidate();
+            logScrollBox.Visible = true;
+            btnAction.IsInteractive = false;
+            btnCancel.IsInteractive = false;
             ThreadPool.QueueUserWorkItem(RunUninstall);
         }
         else if (step == 2)
         {
             titleHeader.Text = "Uninstallation Complete";
-            descLabel.Text = "Spoonbill AI Studio V4 has been cleanly removed from your system.";
-            progressBar.Value = 100;
-            btnAction.Text = "Close";
-            btnAction.Enabled = true;
+            descLabel.Text = "Spoonbill AI Studio V4 has been cleanly removed from your workstation.";
+            currentProgressPercent = 100;
+            customProgressBar.Invalidate();
+            btnAction.ButtonText = "Finish";
+            btnAction.ActiveBackColor = ClrNvidiaGreen;
+            btnAction.ActiveForeColor = Color.Black;
+            btnAction.BorderColor = ClrNvidiaGreen;
+            btnAction.IsInteractive = true;
             btnCancel.Visible = false;
+            btnAction.Location = new Point(550, 12);
         }
     }
 
@@ -250,10 +515,10 @@ public class SpoonbillUninstaller : Form
             SetProgress(80);
             RemoveRegistryEntry();
 
-            AppendLog("Removing application files...");
+            AppendLog("Removing application files from " + targetDir + "...");
             DeleteApplicationDirectory(targetDir);
             SetProgress(100);
-            AppendLog("Uninstallation successful.");
+            AppendLog("Uninstallation completed successfully.");
 
             Thread.Sleep(500);
             this.Invoke((MethodInvoker)delegate {
@@ -264,8 +529,8 @@ public class SpoonbillUninstaller : Form
         {
             AppendLog("Error during uninstallation: " + ex.Message);
             this.Invoke((MethodInvoker)delegate {
-                btnAction.Text = "Close";
-                btnAction.Enabled = true;
+                btnAction.ButtonText = "Close";
+                btnAction.IsInteractive = true;
                 btnCancel.Visible = false;
             });
         }
@@ -277,7 +542,7 @@ public class SpoonbillUninstaller : Form
         {
             this.Invoke((MethodInvoker)delegate {
                 string stamp = DateTime.Now.ToString("HH:mm:ss");
-                logBox.AppendText("[" + stamp + "] " + message + Environment.NewLine);
+                logScrollBox.AppendLine("[" + stamp + "] " + message);
             });
         }
     }
@@ -287,7 +552,8 @@ public class SpoonbillUninstaller : Form
         if (this.IsHandleCreated)
         {
             this.Invoke((MethodInvoker)delegate {
-                progressBar.Value = Math.Min(100, Math.Max(0, val));
+                currentProgressPercent = Math.Min(100, Math.Max(0, val));
+                customProgressBar.Invalidate();
             });
         }
     }
@@ -318,7 +584,6 @@ public class SpoonbillUninstaller : Form
         if (!Directory.Exists(dir)) return;
         try
         {
-            // Delete all files except currently executing binary if any
             string currentExe = Process.GetCurrentProcess().MainModule.FileName;
             foreach (string file in Directory.GetFiles(dir, "*", SearchOption.AllDirectories))
             {
@@ -331,13 +596,49 @@ public class SpoonbillUninstaller : Form
                 catch {}
             }
 
-            // Schedule self-cleanup via background cmd if running from temp or child
             ProcessStartInfo psi = new ProcessStartInfo("cmd.exe", "/c ping 127.0.0.1 -n 2 > nul & rd /s /q \"" + dir + "\"");
             psi.CreateNoWindow = true;
             psi.UseShellExecute = false;
             Process.Start(psi);
         }
         catch {}
+    }
+
+    public void RunVisualVerification(string outDir)
+    {
+        if (!Directory.Exists(outDir)) Directory.CreateDirectory(outDir);
+        this.Show();
+        Application.DoEvents();
+        Thread.Sleep(150);
+
+        ShowStep(0);
+        Application.DoEvents();
+        using (Bitmap bmp = new Bitmap(this.Width, this.Height))
+        {
+            this.DrawToBitmap(bmp, new Rectangle(0, 0, this.Width, this.Height));
+            bmp.Save(Path.Combine(outDir, "uninstall_step0_confirm.png"), ImageFormat.Png);
+        }
+
+        currentStep = 1;
+        targetCard.Visible = false;
+        customProgressBar.Visible = true;
+        currentProgressPercent = 65;
+        customProgressBar.Invalidate();
+        logScrollBox.Visible = true;
+        logScrollBox.SetText(
+            "[19:45:01] Terminating any running Spoonbill Studio processes...\r\n" +
+            "[19:45:01] Removing Desktop shortcut...\r\n" +
+            "[19:45:02] Removing Start Menu shortcut...\r\n" +
+            "[19:45:02] Removing Windows Registry uninstaller registration..."
+        );
+        Application.DoEvents();
+        using (Bitmap bmp = new Bitmap(this.Width, this.Height))
+        {
+            this.DrawToBitmap(bmp, new Rectangle(0, 0, this.Width, this.Height));
+            bmp.Save(Path.Combine(outDir, "uninstall_step1_progress.png"), ImageFormat.Png);
+        }
+
+        this.Close();
     }
 
     [STAThread]
@@ -348,9 +649,16 @@ public class SpoonbillUninstaller : Form
 
         string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         string defaultDir = Path.Combine(localApp, "Programs", "Spoonbill_Studio");
-        string installDir = (args.Length > 0 && Directory.Exists(args[0])) ? args[0] : defaultDir;
 
-        // Check if running inside installDir; if so, copy to %TEMP% to unlock directory deletion
+        if (args != null && args.Length >= 2 && args[0] == "--verify-ui")
+        {
+            SpoonbillUninstaller vForm = new SpoonbillUninstaller(defaultDir);
+            vForm.RunVisualVerification(args[1]);
+            return;
+        }
+
+        string installDir = (args != null && args.Length > 0 && Directory.Exists(args[0])) ? args[0] : defaultDir;
+
         string currentExe = Process.GetCurrentProcess().MainModule.FileName;
         string tempDir = Path.GetTempPath();
         if (currentExe.StartsWith(installDir, StringComparison.OrdinalIgnoreCase))
