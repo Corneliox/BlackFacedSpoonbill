@@ -1,6 +1,6 @@
 /**
- * Spoonbill Studio — Photoshop / Lightroom / Warehouse Edition
- * Ultra-Compact, Zero-Clutter Computer Vision Workspace
+ * Spoonbill Studio v4.1 (Experimental) — Photoshop / Lightroom / Warehouse Edition
+ * Features Non-Destructive Customizable Info Label (HUD) & Dedicated Inspector Tab
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -18,18 +18,47 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let showMasks = true;
   let showBoxes = true;
+  let showBirdTags = true;
   let activeView = 'studio'; // 'studio', 'compare', 'benchmark'
+
+  // Non-Destructive Info HUD Configuration (v4.1 Experimental)
+  const hudConfig = {
+    visible: true,
+    renderMode: 'floating', // 'floating' (DOM overlay) or 'canvas' (pinned to image space)
+    position: 'top-left',   // 'top-left', 'top-right', 'bottom-left', 'bottom-right', 'custom'
+    customX: null,
+    customY: null,
+    theme: 'light',         // 'light', 'dark', 'minimal'
+    opacity: 0.90,
+    scale: 1.00,
+    customNote: '',
+    bakeOnExport: false,
+    fields: {
+      model: true,
+      mode: true,
+      count: true,
+      tiles: true,
+      latency: true,
+      conf: true,
+      res: true
+    }
+  };
 
   // Canvas Pan & Zoom
   const canvas = document.getElementById('studio-canvas');
   const ctx = canvas.getContext('2d');
-  const viewport = document.getElementById('viewport-studio');
+  const viewportStudio = document.getElementById('viewport-studio');
   let zoom = 1.0;
   let panX = 0;
   let panY = 0;
   let isDragging = false;
   let dragStartX = 0;
   let dragStartY = 0;
+
+  // Floating HUD Dragging State
+  let isDraggingHud = false;
+  let hudDragOffsetX = 0;
+  let hudDragOffsetY = 0;
 
   // --- DOM REFERENCES ---
   const topFilename = document.getElementById('top-filename');
@@ -39,7 +68,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const filmstripTrack = document.getElementById('filmstrip-track');
   const fsCount = document.getElementById('fs-count');
 
-  const viewportStudio = document.getElementById('viewport-studio');
   const viewportCompare = document.getElementById('viewport-compare');
   const viewportBenchmark = document.getElementById('viewport-benchmark');
   const toolstrip = document.getElementById('ps-toolstrip');
@@ -50,12 +78,42 @@ document.addEventListener('DOMContentLoaded', () => {
   const tool100 = document.getElementById('tool-100');
   const toolMask = document.getElementById('tool-mask');
   const toolBox = document.getElementById('tool-box');
+  const toolTag = document.getElementById('tool-tag');
+  const toolHud = document.getElementById('tool-hud');
 
   const hudRes = document.getElementById('hud-res');
   const hudZoom = document.getElementById('hud-zoom');
   const hudTime = document.getElementById('hud-time');
   const psBusy = document.getElementById('ps-busy');
   const psBusyText = document.getElementById('ps-busy-text');
+
+  // Floating Info HUD DOM Elements
+  const floatingInfoHud = document.getElementById('floating-info-hud');
+  const btnHudCustomize = document.getElementById('btn-hud-customize');
+  const btnHudHide = document.getElementById('btn-hud-hide');
+  const btnHudRestore = document.getElementById('btn-hud-restore');
+
+  const hudRowTop = document.getElementById('hud-row-top');
+  const infoHudModel = document.getElementById('info-hud-model');
+  const infoHudPipe = document.getElementById('info-hud-pipe');
+  const infoHudMode = document.getElementById('info-hud-mode');
+  const hudRowCount = document.getElementById('hud-row-count');
+  const infoHudCount = document.getElementById('info-hud-count');
+  const hudRowMeta = document.getElementById('hud-row-meta');
+  const infoHudTiles = document.getElementById('info-hud-tiles');
+  const sepTiles = document.getElementById('sep-tiles');
+  const infoHudLatency = document.getElementById('info-hud-latency');
+  const sepLatency = document.getElementById('sep-latency');
+  const infoHudConf = document.getElementById('info-hud-conf');
+  const sepConf = document.getElementById('sep-conf');
+  const infoHudRes = document.getElementById('info-hud-res');
+  const hudRowNote = document.getElementById('hud-row-note');
+
+  // Inspector Tabs & Controls
+  const tabBtnDetect = document.getElementById('tab-btn-detect');
+  const tabBtnHud = document.getElementById('tab-btn-hud');
+  const itabDetect = document.getElementById('itab-detect');
+  const itabHud = document.getElementById('itab-hud');
 
   const birdCountHero = document.getElementById('bird-count-hero');
   const btnRunDetect = document.getElementById('btn-run-detect');
@@ -72,6 +130,26 @@ document.addEventListener('DOMContentLoaded', () => {
   const overlapValText = document.getElementById('overlap-val-text');
   const rngIou = document.getElementById('rng-iou');
   const iouValText = document.getElementById('iou-val-text');
+
+  // Info Label Customizer Controls
+  const chkHudVisible = document.getElementById('chk-hud-visible');
+  const chkBirdTags = document.getElementById('chk-bird-tags');
+  const selectHudRenderMode = document.getElementById('select-hud-render-mode');
+  const btnHudResetPos = document.getElementById('btn-hud-reset-pos');
+  const chkFieldModel = document.getElementById('chk-field-model');
+  const chkFieldMode = document.getElementById('chk-field-mode');
+  const chkFieldCount = document.getElementById('chk-field-count');
+  const chkFieldTiles = document.getElementById('chk-field-tiles');
+  const chkFieldLatency = document.getElementById('chk-field-latency');
+  const chkFieldConf = document.getElementById('chk-field-conf');
+  const chkFieldRes = document.getElementById('chk-field-res');
+  const txtHudNote = document.getElementById('txt-hud-note');
+  const selectHudTheme = document.getElementById('select-hud-theme');
+  const rngHudOpacity = document.getElementById('rng-hud-opacity');
+  const hudOpacityVal = document.getElementById('hud-opacity-val');
+  const rngHudScale = document.getElementById('rng-hud-scale');
+  const hudScaleVal = document.getElementById('hud-scale-val');
+  const chkExportBakeHud = document.getElementById('chk-export-bake-hud');
 
   const instanceList = document.getElementById('instance-list');
   const instancesCountTab = document.getElementById('instances-count-tab');
@@ -149,16 +227,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (hwValCuda) {
       if (h.cuda_available) {
-        hwValCuda.textContent = `✅ Ready (${h.cuda_device_name || 'NVIDIA GPU'}, ${h.cuda_vram_gb || 0} GB)`;
+        hwValCuda.textContent = `Ready (${h.cuda_device_name || 'NVIDIA GPU'}, ${h.cuda_vram_gb || 0} GB)`;
         hwValCuda.style.color = '#10B981';
       } else if (h.has_nvidia_hardware) {
-        hwValCuda.textContent = '⚠️ NVIDIA Detected (PyTorch CUDA Missing)';
+        hwValCuda.textContent = 'NVIDIA Detected (PyTorch CUDA Missing)';
         hwValCuda.style.color = '#F59E0B';
       } else if (h.mps_available) {
-        hwValCuda.textContent = '✅ Apple Silicon Metal (MPS) Supported';
+        hwValCuda.textContent = 'Apple Silicon Metal (MPS) Supported';
         hwValCuda.style.color = '#3B82F6';
       } else {
-        hwValCuda.textContent = '❌ No Discrete NVIDIA GPU / CUDA';
+        hwValCuda.textContent = 'No Discrete NVIDIA GPU / CUDA';
         hwValCuda.style.color = '#A1A1AA';
       }
     }
@@ -173,9 +251,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (hwStatusTitle) hwStatusTitle.textContent = h.status_label || 'Status Akselerasi';
     if (hwStatusDesc) hwStatusDesc.textContent = h.description || 'Pemeriksaan status perangkat selesai.';
-    if (hwStatusIcon) hwStatusIcon.textContent = h.cuda_available ? '⚡' : h.has_nvidia_hardware ? '⚠️' : '💻';
+    if (hwStatusIcon) hwStatusIcon.textContent = h.cuda_available ? 'GPU' : h.has_nvidia_hardware ? 'NV' : 'CPU';
 
-    // Buttons
     if (btnSetCudaMode) {
       if (h.can_enable_gpu) {
         btnSetCudaMode.disabled = false;
@@ -229,7 +306,6 @@ document.addEventListener('DOMContentLoaded', () => {
       updateHardwarePill();
       populateHardwareModal();
 
-      // Refresh catalog models
       const modelsRes = await fetch('/api/models').then(r => r.json());
       modelsCatalog = modelsRes.models || [];
       populateModelPicker();
@@ -259,10 +335,417 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // --- INSPECTOR TAB SWITCHING (MODEL & SAHI vs INFO LABEL) ---
+  function switchInspectorTab(tabName) {
+    const isDetect = (tabName === 'detect');
+    tabBtnDetect.classList.toggle('active', isDetect);
+    tabBtnHud.classList.toggle('active', !isDetect);
+    itabDetect.classList.toggle('hidden', !isDetect);
+    itabHud.classList.toggle('hidden', isDetect);
+  }
+
+  tabBtnDetect.addEventListener('click', () => switchInspectorTab('detect'));
+  tabBtnHud.addEventListener('click', () => switchInspectorTab('hud'));
+
+  // --- NON-DESTRUCTIVE INFO HUD ENGINE (V4.1 EXPERIMENTAL) ---
+  function getActiveTelemetryData() {
+    if (latestResult) {
+      const h = latestResult.image_shape ? latestResult.image_shape[0] : (baseImg.height || 0);
+      const w = latestResult.image_shape ? latestResult.image_shape[1] : (baseImg.width || 0);
+      return {
+        modelName: latestResult.model_name || '11N V3 (ONNX)',
+        modeStr: latestResult.mode || (chkSahi.checked ? 'SAHI (TILED)' : 'DIRECT (SINGLE-PASS)'),
+        count: latestResult.total_count || 0,
+        slices: latestResult.total_slices || 1,
+        latencyMs: latestResult.inference_time_ms || 0.0,
+        confPct: ((latestResult.mean_confidence || 0) * 100).toFixed(1),
+        resStr: `${w}×${h}`
+      };
+    }
+    const selModel = modelsCatalog.find(x => x.id === selectModel.value);
+    return {
+      modelName: selModel ? selModel.short_name : '11N V3 (ONNX)',
+      modeStr: chkSahi.checked ? 'SAHI (TILED)' : 'DIRECT (SINGLE-PASS)',
+      count: 0,
+      slices: 1,
+      latencyMs: 0.0,
+      confPct: '0.0',
+      resStr: baseImg.width ? `${baseImg.width}×${baseImg.height}` : '0×0'
+    };
+  }
+
+  function syncInfoHudUI() {
+    const t = getActiveTelemetryData();
+    const f = hudConfig.fields;
+
+    // Sync checkboxes & toolbar buttons
+    chkHudVisible.checked = hudConfig.visible;
+    toolHud.classList.toggle('active', hudConfig.visible);
+    chkBirdTags.checked = showBirdTags;
+    toolTag.classList.toggle('active', showBirdTags);
+
+    // Populate floating DOM HUD text & field visibility
+    infoHudModel.textContent = t.modelName;
+    infoHudModel.classList.toggle('hidden', !f.model);
+
+    infoHudMode.textContent = t.modeStr;
+    infoHudMode.classList.toggle('hidden', !f.mode);
+
+    infoHudPipe.classList.toggle('hidden', !(f.model && f.mode));
+    hudRowTop.classList.toggle('hidden', !(f.model || f.mode));
+
+    infoHudCount.textContent = `${t.count}`;
+    hudRowCount.classList.toggle('hidden', !f.count);
+
+    infoHudTiles.textContent = `Tiles: ${t.slices}`;
+    infoHudTiles.classList.toggle('hidden', !f.tiles);
+
+    infoHudLatency.textContent = `${t.latencyMs} ms`;
+    infoHudLatency.classList.toggle('hidden', !f.latency);
+
+    infoHudConf.textContent = `Conf: ${t.confPct}%`;
+    infoHudConf.classList.toggle('hidden', !f.conf);
+
+    infoHudRes.textContent = t.resStr;
+    infoHudRes.classList.toggle('hidden', !f.res);
+
+    // Dynamic separators in metadata row
+    const visibleMeta = [
+      { el: infoHudTiles, sep: sepTiles, on: f.tiles },
+      { el: infoHudLatency, sep: sepLatency, on: f.latency },
+      { el: infoHudConf, sep: sepConf, on: f.conf },
+      { el: infoHudRes, sep: null, on: f.res }
+    ];
+    for (let i = 0; i < visibleMeta.length; i++) {
+      if (visibleMeta[i].sep) {
+        const hasFollowing = visibleMeta.slice(i + 1).some(m => m.on);
+        visibleMeta[i].sep.classList.toggle('hidden', !(visibleMeta[i].on && hasFollowing));
+      }
+    }
+    const anyMeta = visibleMeta.some(m => m.on);
+    hudRowMeta.classList.toggle('hidden', !anyMeta);
+
+    // Custom survey note
+    const noteText = (hudConfig.customNote || '').trim();
+    if (noteText.length > 0) {
+      hudRowNote.textContent = noteText;
+      hudRowNote.classList.remove('hidden');
+    } else {
+      hudRowNote.textContent = '';
+      hudRowNote.classList.add('hidden');
+    }
+
+    // Theme & Opacity & Scale
+    floatingInfoHud.classList.remove('theme-light', 'theme-dark', 'theme-minimal');
+    floatingInfoHud.classList.add(`theme-${hudConfig.theme}`);
+
+    const alpha = hudConfig.opacity;
+    if (hudConfig.theme === 'light') {
+      floatingInfoHud.style.backgroundColor = `rgba(252, 252, 250, ${alpha})`;
+    } else if (hudConfig.theme === 'dark') {
+      floatingInfoHud.style.backgroundColor = `rgba(20, 20, 24, ${alpha})`;
+    } else {
+      floatingInfoHud.style.backgroundColor = `rgba(16, 16, 18, ${alpha})`;
+    }
+    floatingInfoHud.style.transform = `scale(${hudConfig.scale})`;
+
+    // Position classes or custom dragged coordinates
+    floatingInfoHud.classList.remove('pos-top-left', 'pos-top-right', 'pos-bottom-left', 'pos-bottom-right');
+    if (hudConfig.position === 'custom' && hudConfig.customX !== null && hudConfig.customY !== null) {
+      floatingInfoHud.style.left = `${hudConfig.customX}px`;
+      floatingInfoHud.style.top = `${hudConfig.customY}px`;
+      floatingInfoHud.style.right = 'auto';
+      floatingInfoHud.style.bottom = 'auto';
+      floatingInfoHud.style.transformOrigin = 'top left';
+    } else {
+      floatingInfoHud.style.left = '';
+      floatingInfoHud.style.top = '';
+      floatingInfoHud.style.right = '';
+      floatingInfoHud.style.bottom = '';
+      floatingInfoHud.style.transformOrigin = '';
+      const posClass = `pos-${hudConfig.position || 'top-left'}`;
+      floatingInfoHud.classList.add(posClass);
+    }
+
+    // Sync active corner pill
+    document.querySelectorAll('.pos-pill').forEach(p => {
+      p.classList.toggle('active', p.getAttribute('data-pos') === hudConfig.position);
+    });
+
+    // Show/hide floating DOM vs Canvas-pinned mode vs Restore Pill
+    const shouldShowFloating = hudConfig.visible && hudConfig.renderMode === 'floating';
+    floatingInfoHud.classList.toggle('hidden', !shouldShowFloating);
+    btnHudRestore.classList.toggle('hidden', hudConfig.visible);
+
+    drawCanvas();
+  }
+
+  // Draw customizable Info Box onto any 2D Canvas Context (used for 'canvas' renderMode AND optional Image Export)
+  function drawCustomHudOnCanvasContext(targetCtx, imgWidth, imgHeight) {
+    const t = getActiveTelemetryData();
+    const f = hudConfig.fields;
+
+    const lines = [];
+    if (f.model || f.mode) {
+      const parts = [];
+      if (f.model) parts.push(t.modelName);
+      if (f.mode) parts.push(t.modeStr);
+      lines.push({ text: parts.join('  |  '), type: 'header' });
+    }
+    if (f.count) {
+      lines.push({ text: `Detected: ${t.count} Spoonbills`, type: 'hero' });
+    }
+    const metaParts = [];
+    if (f.tiles) metaParts.push(`Tiles: ${t.slices}`);
+    if (f.latency) metaParts.push(`${t.latencyMs} ms`);
+    if (f.conf) metaParts.push(`Conf: ${t.confPct}%`);
+    if (f.res) metaParts.push(t.resStr);
+    if (metaParts.length > 0) {
+      lines.push({ text: metaParts.join('  ·  '), type: 'meta' });
+    }
+    const noteText = (hudConfig.customNote || '').trim();
+    if (noteText.length > 0) {
+      lines.push({ text: noteText, type: 'note' });
+    }
+
+    if (lines.length === 0) return;
+
+    const s = hudConfig.scale * Math.max(0.85, Math.min(1.6, imgWidth / 1200));
+    const padX = Math.round(16 * s);
+    const padY = Math.round(12 * s);
+    const lineGap = Math.round(7 * s);
+
+    targetCtx.save();
+    let maxTextW = 0;
+    let totalTextH = 0;
+
+    lines.forEach((ln) => {
+      if (ln.type === 'header') {
+        targetCtx.font = `600 ${Math.round(13 * s)}px Inter, Segoe UI, sans-serif`;
+        ln.height = Math.round(16 * s);
+      } else if (ln.type === 'hero') {
+        targetCtx.font = `800 ${Math.round(19 * s)}px Inter, Segoe UI, sans-serif`;
+        ln.height = Math.round(23 * s);
+      } else if (ln.type === 'meta') {
+        targetCtx.font = `500 ${Math.round(12 * s)}px JetBrains Mono, Consolas, monospace`;
+        ln.height = Math.round(15 * s);
+      } else {
+        targetCtx.font = `600 ${Math.round(12 * s)}px Inter, Segoe UI, sans-serif`;
+        ln.height = Math.round(15 * s);
+      }
+      const m = targetCtx.measureText(ln.text);
+      if (m.width > maxTextW) maxTextW = m.width;
+      totalTextH += ln.height;
+    });
+    totalTextH += Math.max(0, lines.length - 1) * lineGap;
+
+    const boxW = Math.min(imgWidth - 24, Math.round(maxTextW + padX * 2 + 8 * s));
+    const boxH = Math.round(totalTextH + padY * 2);
+    const margin = Math.round(14 * s);
+
+    let bx = margin;
+    let by = margin;
+    if (hudConfig.position === 'top-right') {
+      bx = Math.max(margin, imgWidth - boxW - margin);
+      by = margin;
+    } else if (hudConfig.position === 'bottom-left') {
+      bx = margin;
+      by = Math.max(margin, imgHeight - boxH - margin);
+    } else if (hudConfig.position === 'bottom-right') {
+      bx = Math.max(margin, imgWidth - boxW - margin);
+      by = Math.max(margin, imgHeight - boxH - margin);
+    }
+
+    // Card Background
+    const alpha = hudConfig.opacity;
+    if (hudConfig.theme === 'light') {
+      targetCtx.fillStyle = `rgba(252, 252, 250, ${alpha})`;
+      targetCtx.strokeStyle = 'rgba(210, 214, 220, 0.95)';
+    } else {
+      targetCtx.fillStyle = `rgba(20, 20, 24, ${alpha})`;
+      targetCtx.strokeStyle = 'rgba(63, 63, 70, 0.95)';
+    }
+
+    targetCtx.lineWidth = 1.5;
+    targetCtx.fillRect(bx, by, boxW, boxH);
+    targetCtx.strokeRect(bx, by, boxW, boxH);
+
+    // Left Terracotta Accent Bar
+    targetCtx.fillStyle = '#F6821F';
+    targetCtx.fillRect(bx, by, Math.max(4, Math.round(5 * s)), boxH);
+
+    // Render Text Lines
+    let curY = by + padY;
+    const textX = bx + padX + Math.round(4 * s);
+
+    lines.forEach((ln) => {
+      curY += ln.height * 0.82;
+      if (ln.type === 'header') {
+        targetCtx.font = `600 ${Math.round(13 * s)}px Inter, Segoe UI, sans-serif`;
+        targetCtx.fillStyle = hudConfig.theme === 'light' ? '#52525B' : '#A1A1AA';
+      } else if (ln.type === 'hero') {
+        targetCtx.font = `800 ${Math.round(19 * s)}px Inter, Segoe UI, sans-serif`;
+        targetCtx.fillStyle = hudConfig.theme === 'light' ? '#18181B' : '#FFFFFF';
+      } else if (ln.type === 'meta') {
+        targetCtx.font = `500 ${Math.round(12 * s)}px JetBrains Mono, Consolas, monospace`;
+        targetCtx.fillStyle = hudConfig.theme === 'light' ? '#71717A' : '#D4D4D8';
+      } else {
+        targetCtx.font = `600 ${Math.round(12 * s)}px Inter, Segoe UI, sans-serif`;
+        targetCtx.fillStyle = '#F6821F';
+      }
+      targetCtx.fillText(ln.text, textX, curY);
+      curY += ln.height * 0.18 + lineGap;
+    });
+
+    targetCtx.restore();
+  }
+
+  function initHudCustomizerEvents() {
+    // Toggle HUD visibility from Inspector, Toolstrip, Floating Close button, or Restore Pill
+    chkHudVisible.addEventListener('change', () => {
+      hudConfig.visible = chkHudVisible.checked;
+      syncInfoHudUI();
+    });
+
+    toolHud.addEventListener('click', () => {
+      hudConfig.visible = !hudConfig.visible;
+      syncInfoHudUI();
+    });
+
+    btnHudHide.addEventListener('click', (e) => {
+      e.stopPropagation();
+      hudConfig.visible = false;
+      syncInfoHudUI();
+    });
+
+    btnHudRestore.addEventListener('click', () => {
+      hudConfig.visible = true;
+      syncInfoHudUI();
+    });
+
+    btnHudCustomize.addEventListener('click', (e) => {
+      e.stopPropagation();
+      switchInspectorTab('hud');
+    });
+
+    // Per-Bird Confidence Tags Toggle
+    chkBirdTags.addEventListener('change', () => {
+      showBirdTags = chkBirdTags.checked;
+      toolTag.classList.toggle('active', showBirdTags);
+      if (latestResult) runInference();
+    });
+
+    toolTag.addEventListener('click', () => {
+      showBirdTags = !showBirdTags;
+      chkBirdTags.checked = showBirdTags;
+      toolTag.classList.toggle('active', showBirdTags);
+      if (latestResult) runInference();
+    });
+
+    // Render Mode (Floating Viewport vs Pinned on Canvas)
+    selectHudRenderMode.addEventListener('change', () => {
+      hudConfig.renderMode = selectHudRenderMode.value;
+      syncInfoHudUI();
+    });
+
+    // Corner Anchor Pills & Reset Position
+    document.querySelectorAll('.pos-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        hudConfig.position = pill.getAttribute('data-pos');
+        hudConfig.customX = null;
+        hudConfig.customY = null;
+        syncInfoHudUI();
+      });
+    });
+
+    btnHudResetPos.addEventListener('click', () => {
+      hudConfig.position = 'top-left';
+      hudConfig.customX = null;
+      hudConfig.customY = null;
+      syncInfoHudUI();
+    });
+
+    // Field Checkboxes
+    const fieldMap = [
+      [chkFieldModel, 'model'],
+      [chkFieldMode, 'mode'],
+      [chkFieldCount, 'count'],
+      [chkFieldTiles, 'tiles'],
+      [chkFieldLatency, 'latency'],
+      [chkFieldConf, 'conf'],
+      [chkFieldRes, 'res']
+    ];
+    fieldMap.forEach(([chk, key]) => {
+      if (!chk) return;
+      chk.addEventListener('change', () => {
+        hudConfig.fields[key] = chk.checked;
+        syncInfoHudUI();
+      });
+    });
+
+    // Custom Survey Note
+    txtHudNote.addEventListener('input', () => {
+      hudConfig.customNote = txtHudNote.value;
+      syncInfoHudUI();
+    });
+
+    // Theme, Opacity & Scale
+    selectHudTheme.addEventListener('change', () => {
+      hudConfig.theme = selectHudTheme.value;
+      syncInfoHudUI();
+    });
+
+    rngHudOpacity.addEventListener('input', () => {
+      hudOpacityVal.textContent = `${rngHudOpacity.value}%`;
+      hudConfig.opacity = parseInt(rngHudOpacity.value, 10) / 100.0;
+      syncInfoHudUI();
+    });
+
+    rngHudScale.addEventListener('input', () => {
+      hudScaleVal.textContent = `${rngHudScale.value}%`;
+      hudConfig.scale = parseInt(rngHudScale.value, 10) / 100.0;
+      syncInfoHudUI();
+    });
+
+    chkExportBakeHud.addEventListener('change', () => {
+      hudConfig.bakeOnExport = chkExportBakeHud.checked;
+    });
+
+    // Dragging the Floating Info HUD on the Viewport
+    floatingInfoHud.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.info-hud-actions')) return;
+      e.stopPropagation();
+      isDraggingHud = true;
+      const vpRect = viewportStudio.getBoundingClientRect();
+      const hudRect = floatingInfoHud.getBoundingClientRect();
+      hudDragOffsetX = e.clientX - hudRect.left;
+      hudDragOffsetY = e.clientY - hudRect.top;
+      hudConfig.position = 'custom';
+      hudConfig.customX = hudRect.left - vpRect.left;
+      hudConfig.customY = hudRect.top - vpRect.top;
+      syncInfoHudUI();
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDraggingHud) return;
+      const vpRect = viewportStudio.getBoundingClientRect();
+      const maxX = Math.max(10, vpRect.width - floatingInfoHud.offsetWidth - 10);
+      const maxY = Math.max(10, vpRect.height - floatingInfoHud.offsetHeight - 10);
+      hudConfig.customX = Math.max(8, Math.min(maxX, e.clientX - vpRect.left - hudDragOffsetX));
+      hudConfig.customY = Math.max(8, Math.min(maxY, e.clientY - vpRect.top - hudDragOffsetY));
+      syncInfoHudUI();
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDraggingHud = false;
+    });
+  }
+
   // --- 1. INITIALIZATION ---
   async function initStudio() {
     try {
       initHardwareInspector();
+      initHudCustomizerEvents();
       await fetchHardwareInfo();
 
       const [modelsRes, samplesRes, benchRes] = await Promise.all([
@@ -284,6 +767,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
       benchmarkRows = benchRes.benchmarks || [];
       renderBenchmarkTable('ALL');
+
+      syncInfoHudUI();
 
       // Auto-load first sample
       if (samplesCatalog.length > 0) {
@@ -314,9 +799,9 @@ document.addEventListener('DOMContentLoaded', () => {
         let label = m.short_name;
         if (activeHardwareMode === 'cpu') {
           if (m.scale === 'N' || m.recommended) {
-            label = `⚡ ${m.short_name} [Rekomendasi CPU]`;
+            label = `[Fast CPU] ${m.short_name}`;
           } else if (m.cpu_warning || m.scale === 'L' || m.scale === 'M') {
-            label = `⚠️ ${m.short_name} [GPU Disarankan]`;
+            label = `[GPU Rec] ${m.short_name}`;
           }
         }
         opt.textContent = `${label} (${m.params})`;
@@ -325,7 +810,6 @@ document.addEventListener('DOMContentLoaded', () => {
       selectModel.appendChild(og);
     });
 
-    // Default selection: If CPU, default to 11N Nano; if GPU, default to 11L
     if (activeHardwareMode === 'cpu' && modelsCatalog.some(m => m.id === 'v3_11n_onnx')) {
       selectModel.value = 'v3_11n_onnx';
     } else if (modelsCatalog.some(m => m.id === 'v3_11l_onnx')) {
@@ -349,11 +833,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (activeHardwareMode === 'cpu' && (m.cpu_warning || m.scale === 'L' || m.scale === 'M')) {
         warnContainer.style.display = 'block';
         warnBadge.className = 'model-badge-warn';
-        warnBadge.textContent = m.warning_text || '⚠️ Disarankan NVIDIA GPU (Beban CPU Tinggi)';
+        warnBadge.textContent = 'Disarankan NVIDIA GPU (Beban CPU Tinggi)';
       } else if (activeHardwareMode === 'cpu' && (m.scale === 'N' || m.recommended)) {
         warnContainer.style.display = 'block';
         warnBadge.className = 'model-badge-rec';
-        warnBadge.textContent = '⚡ Rekomendasi CPU Aktif: Kecepatan Instan (<60ms)';
+        warnBadge.textContent = 'Rekomendasi CPU Aktif: Kecepatan Instan (<60ms)';
       } else {
         warnContainer.style.display = 'none';
       }
@@ -409,18 +893,17 @@ document.addEventListener('DOMContentLoaded', () => {
       fitToCanvas();
       drawCanvas();
       hudRes.textContent = `${baseImg.width}×${baseImg.height} px`;
+      syncInfoHudUI();
       runInference();
     };
     baseImg.src = `/api/sample_image/${encodeURIComponent(filename)}`;
   }
 
-  // Toggle Filmstrip visibility for maximum canvas real estate
   btnToggleFilmstrip.addEventListener('click', () => {
     filmstrip.classList.toggle('hidden');
     setTimeout(resizeCanvas, 50);
   });
 
-  // File Upload (Drag-drop & Picker)
   fileInput.addEventListener('change', (e) => {
     if (e.target.files.length > 0) {
       loadUserFile(e.target.files[0]);
@@ -450,7 +933,6 @@ document.addEventListener('DOMContentLoaded', () => {
     currentSampleName = null;
     topFilename.textContent = file.name;
 
-    // Add to filmstrip as active item
     const box = document.createElement('div');
     box.className = 'fs-item active';
     box.setAttribute('data-fname', file.name);
@@ -470,6 +952,7 @@ document.addEventListener('DOMContentLoaded', () => {
         fitToCanvas();
         drawCanvas();
         hudRes.textContent = `${baseImg.width}×${baseImg.height} px`;
+        syncInfoHudUI();
         runInference();
       };
       baseImg.src = ev.target.result;
@@ -506,12 +989,16 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.translate(panX, panY);
     ctx.scale(zoom, zoom);
 
-    // Render photo with delicate dark border & shadow
     ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
     ctx.shadowBlur = 18 / zoom;
     ctx.shadowOffsetY = 4 / zoom;
     ctx.drawImage(img, 0, 0);
     ctx.shadowColor = 'transparent';
+
+    // Non-destructive Canvas-pinned HUD mode (if selected by user)
+    if (hudConfig.visible && hudConfig.renderMode === 'canvas') {
+      drawCustomHudOnCanvasContext(ctx, img.width, img.height);
+    }
 
     // Draw active bird focus ring
     if (highlightedBBox) {
@@ -540,6 +1027,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   viewportStudio.addEventListener('mousedown', (e) => {
+    if (e.target.closest('#floating-info-hud') || e.target.closest('#btn-hud-restore')) return;
     if (e.button === 0) {
       isDragging = true;
       dragStartX = e.clientX - panX;
@@ -548,7 +1036,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   window.addEventListener('mousemove', (e) => {
-    if (isDragging) {
+    if (isDragging && !isDraggingHud) {
       panX = e.clientX - dragStartX;
       panY = e.clientY - dragStartY;
       drawCanvas();
@@ -561,7 +1049,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Toolbar actions
   toolPan.addEventListener('click', () => {
-    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
     toolPan.classList.add('active');
   });
   toolFit.addEventListener('click', () => {
@@ -591,15 +1078,38 @@ document.addEventListener('DOMContentLoaded', () => {
     if (latestResult) runInference();
   });
 
-  // --- 4. RUN INFERENCE ---
-  btnRunDetect.addEventListener('click', runInference);
-
-  // Shortcut: Enter key runs detection
+  // Keyboard Shortcuts: Enter = Detect, I = Toggle Info HUD, T = Toggle Bird Tags, M = Masks, B = Boxes, F = Fit
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && activeView === 'studio' && !e.target.matches('input, select')) {
+    if (e.target.matches('input, select, textarea')) return;
+    if (activeView !== 'studio') return;
+
+    if (e.key === 'Enter') {
       runInference();
+    } else if (e.key === 'i' || e.key === 'I') {
+      hudConfig.visible = !hudConfig.visible;
+      syncInfoHudUI();
+    } else if (e.key === 't' || e.key === 'T') {
+      showBirdTags = !showBirdTags;
+      chkBirdTags.checked = showBirdTags;
+      toolTag.classList.toggle('active', showBirdTags);
+      if (latestResult) runInference();
+    } else if (e.key === 'm' || e.key === 'M') {
+      showMasks = !showMasks;
+      toolMask.classList.toggle('active', showMasks);
+      if (latestResult) runInference();
+    } else if (e.key === 'b' || e.key === 'B') {
+      showBoxes = !showBoxes;
+      toolBox.classList.toggle('active', showBoxes);
+      if (latestResult) runInference();
+    } else if (e.key === 'f' || e.key === 'F') {
+      highlightedBBox = null;
+      fitToCanvas();
+      drawCanvas();
     }
   });
+
+  // --- 4. RUN INFERENCE ---
+  btnRunDetect.addEventListener('click', runInference);
 
   async function runInference() {
     if (!currentFile && !currentSampleName) return;
@@ -609,16 +1119,17 @@ document.addEventListener('DOMContentLoaded', () => {
     if (currentSampleName) fd.append('sample_name', currentSampleName);
     fd.append('model_id', selectModel.value);
     fd.append('use_sahi', chkSahi.checked);
-    fd.append('slice_size', parseInt(rngTile.value));
+    fd.append('slice_size', parseInt(rngTile.value, 10));
     fd.append('overlap', parseFloat(rngOverlap.value) / 100);
     fd.append('conf', parseFloat(rngConf.value) / 100);
     fd.append('iou', parseFloat(rngIou.value) / 100);
     fd.append('draw_masks', showMasks);
     fd.append('draw_boxes', showBoxes);
-    fd.append('draw_labels', true);
+    fd.append('draw_labels', showBirdTags);
+    fd.append('draw_hud', false); // Never bake HUD on backend so image stays 100% clean & non-destructive
 
     psBusy.classList.remove('hidden');
-    psBusyText.textContent = `Detecting spoonbills...`;
+    psBusyText.textContent = 'Detecting spoonbills...';
     btnRunDetect.disabled = true;
 
     try {
@@ -631,13 +1142,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
       annotatedImg = new Image();
       annotatedImg.onload = () => {
+        syncInfoHudUI();
         drawCanvas();
       };
       annotatedImg.src = data.image_data;
 
-      // Update hero count & HUD
+      // Update hero count & status bar
       birdCountHero.textContent = `${data.total_count}`;
       hudTime.textContent = `${data.inference_time_ms} ms (${data.total_slices} tiles)`;
+      syncInfoHudUI();
 
       // Enable exports
       btnExportImg.disabled = false;
@@ -710,6 +1223,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   [rngTile, rngOverlap, rngIou, chkSahi].forEach(ctrl => {
     ctrl.addEventListener('change', () => {
+      syncInfoHudUI();
       if (latestResult) runInference();
     });
   });
@@ -743,12 +1257,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Exports
+  // --- EXPORTS (SUPPORTS CLEAN IMAGE OR OPTIONAL ATTACHED CUSTOM HUD) ---
   btnExportImg.addEventListener('click', () => {
     if (!latestResult) return;
+
+    // If user unchecked 'Attach Info Box on Saved Image', export the clean segmented image directly
+    if (!hudConfig.bakeOnExport || !annotatedImg.width) {
+      const a = document.createElement('a');
+      a.href = latestResult.image_data;
+      a.download = `Spoonbill_${latestResult.model_id}_${latestResult.filename}`;
+      a.click();
+      return;
+    }
+
+    // Otherwise composite the user's customized HUD onto a full-resolution offscreen canvas
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = annotatedImg.width;
+    offCanvas.height = annotatedImg.height;
+    const offCtx = offCanvas.getContext('2d');
+    offCtx.drawImage(annotatedImg, 0, 0);
+    drawCustomHudOnCanvasContext(offCtx, offCanvas.width, offCanvas.height);
+
     const a = document.createElement('a');
-    a.href = latestResult.image_data;
-    a.download = `Spoonbill_${latestResult.model_id}_${latestResult.filename}`;
+    a.href = offCanvas.toDataURL('image/jpeg', 0.94);
+    a.download = `Spoonbill_HUD_${latestResult.model_id}_${latestResult.filename}`;
     a.click();
   });
 
@@ -806,6 +1338,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fd.append('model_b', 'ablation_beakattn_l');
     fd.append('compare_mode', 'segmentation');
     fd.append('use_sahi', true);
+    fd.append('draw_hud', false);
 
     try {
       const resp = await fetch('/api/compare', { method: 'POST', body: fd });
@@ -834,7 +1367,7 @@ document.addEventListener('DOMContentLoaded', () => {
     filtered.forEach(r => {
       const isBeakAttn = (r['Model Name'] || '').includes('BeakAttn');
       const tr = document.createElement('tr');
-      const fmt = (v) => v ? `${(parseFloat(v)*100).toFixed(1)}%` : '—';
+      const fmt = (v) => v ? `${(parseFloat(v) * 100).toFixed(1)}%` : '—';
       tr.innerHTML = `
         <td style="color:var(--ps-text-muted);">${r['Group']}</td>
         <td><strong style="color:${isBeakAttn ? 'var(--ps-accent)' : 'inherit'};">${r['Model Name']}</strong></td>
@@ -845,7 +1378,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${fmt(r['Mask Precision'])}</td>
         <td>${fmt(r['Mask Recall'])}</td>
         <td>${fmt(r['Box mAP50'])}</td>
-        <td style="color:${isBeakAttn && r['Scale']==='L' ? 'var(--ps-accent)' : 'inherit'};"><b>${fmt(r['Box Precision'])}</b></td>
+        <td style="color:${isBeakAttn && r['Scale'] === 'L' ? 'var(--ps-accent)' : 'inherit'};"><b>${fmt(r['Box Precision'])}</b></td>
         <td>${parseFloat(r['Val Seg Loss'] || 0).toFixed(4)}</td>
       `;
       tbody.appendChild(tr);

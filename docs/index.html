@@ -359,7 +359,8 @@
     </div>
     <div class="header-links">
       <a href="https://github.com/Corneliox/BlackFacedSpoonbill" class="btn btn-secondary" target="_blank" rel="noopener">GitHub Repository</a>
-      <a href="https://github.com/Corneliox/BlackFacedSpoonbill/releases/tag/v4.0.0" class="btn btn-primary" target="_blank" rel="noopener">Download Desktop Studio (v4.0.0)</a>
+      <a href="https://github.com/Corneliox/BlackFacedSpoonbill/releases/tag/v4.1.0-experimental" class="btn btn-secondary" style="border-color:var(--accent); color:var(--accent);" target="_blank" rel="noopener">Try v4.1 Experimental</a>
+      <a href="https://github.com/Corneliox/BlackFacedSpoonbill/releases/tag/v4.0.0" class="btn btn-primary" target="_blank" rel="noopener">Download Stable (v4.0.0)</a>
     </div>
   </header>
 
@@ -369,7 +370,8 @@
       <strong>Browser Evaluation Constraint:</strong> This web demonstration executes client-side WebAssembly using solely the lightweight <strong>YOLO11 Nano (11N ONNX)</strong> model. Large models (11L, BeakAttention-L @ P3), SAHI high-resolution tiling, and batch multi-image census are restricted to the native desktop application.
     </div>
     <div class="restriction-actions">
-      <a href="https://github.com/Corneliox/BlackFacedSpoonbill/releases/tag/v4.0.0" class="btn btn-secondary" target="_blank" rel="noopener">Get Full Desktop Installers</a>
+      <a href="https://github.com/Corneliox/BlackFacedSpoonbill/releases/tag/v4.0.0" class="btn btn-secondary" target="_blank" rel="noopener">Stable v4.0.0</a>
+      <a href="https://github.com/Corneliox/BlackFacedSpoonbill/releases/tag/v4.1.0-experimental" class="btn btn-secondary" target="_blank" rel="noopener">v4.1.0 Experimental</a>
     </div>
   </aside>
 
@@ -428,6 +430,14 @@
         <input type="range" id="rng-iou" min="10" max="90" step="5" value="45">
       </div>
 
+      <div class="control-group" style="border-top: 1px solid var(--border-color); padding-top: 10px;">
+        <label class="section-title" style="margin-bottom:4px;">v4.1 Info Label Overlay (Non-Destructive)</label>
+        <label style="display:flex; align-items:center; gap:8px; font-size:0.78rem; cursor:pointer; color:#D1D5DB;">
+          <input type="checkbox" id="chk-web-hud" checked style="width:auto; accent-color:var(--accent);">
+          <span>Show Floating Telemetry Info Box</span>
+        </label>
+      </div>
+
       <button id="btn-detect" class="btn btn-primary" style="padding:10px; font-size:0.9rem;">
         Run Client-Side Detection
       </button>
@@ -449,7 +459,10 @@
         <strong>Need High Accuracy or Panoramic SAHI?</strong>
         <span>The full-scale desktop edition includes multi-scale ablation models (+19.4% precision), full SAHI tiling for 4K imagery, and offline operation:</span>
         <a href="https://github.com/Corneliox/BlackFacedSpoonbill/releases/tag/v4.0.0" target="_blank" rel="noopener">
-          Download Desktop Installers for Win / Mac / Linux &rarr;
+          Download Stable v4.0.0 &rarr;
+        </a>
+        <a href="https://github.com/Corneliox/BlackFacedSpoonbill/releases/tag/v4.1.0-experimental" target="_blank" rel="noopener">
+          Try v4.1.0 Experimental (Customizable Info HUD) &rarr;
         </a>
       </div>
 
@@ -462,10 +475,10 @@
         <div id="loading-spinner" class="loading-spinner">Processing Neural Inference...</div>
       </div>
 
-      <div class="hud-overlay">
-        <span>Image Resolution: <strong id="hud-dims">—</strong></span>
-        <span>Detected Instances: <strong id="hud-count">0</strong></span>
-        <span>Model: <strong>YOLO11 Nano (11N)</strong></span>
+      <div class="hud-overlay" id="web-hud-overlay">
+        <span>Model: <strong>11N V3 (ONNX) | DIRECT</strong></span>
+        <span>Detected: <strong id="hud-count">0 Spoonbills</strong></span>
+        <span>Resolution: <strong id="hud-dims">—</strong></span>
       </div>
     </section>
 
@@ -495,6 +508,14 @@
     // Update range indicators
     rngConf.addEventListener('input', (e) => txtConf.textContent = `${e.target.value}%`);
     rngIou.addEventListener('input', (e) => txtIou.textContent = `${e.target.value}%`);
+
+    const chkWebHud = document.getElementById('chk-web-hud');
+    const webHudOverlay = document.getElementById('web-hud-overlay');
+    if (chkWebHud && webHudOverlay) {
+      chkWebHud.addEventListener('change', (e) => {
+        webHudOverlay.style.display = e.target.checked ? 'flex' : 'none';
+      });
+    }
 
     // Load sample image
     function loadSample(src) {

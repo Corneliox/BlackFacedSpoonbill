@@ -1,7 +1,8 @@
 # Black-Faced Spoonbill AI Detection & Instance Segmentation Project
 ### Automated Instance Segmentation, Attention-Guided Feature Extraction, and Demographic Census Platform for *Platalea minor*
 
-[![Release v4.0.0](https://img.shields.io/badge/Release-v4.0.0-blue.svg)](https://github.com/Corneliox/BlackFacedSpoonbill/releases/tag/v4.0.0)
+[![Release v4.0.0 Stable](https://img.shields.io/badge/Release-v4.0.0_Stable-blue.svg)](https://github.com/Corneliox/BlackFacedSpoonbill/releases/tag/v4.0.0)
+[![Pre-Release v4.1.0 Experimental](https://img.shields.io/badge/Pre--Release-v4.1.0_Experimental-purple.svg)](https://github.com/Corneliox/BlackFacedSpoonbill/releases/tag/v4.1.0-experimental)
 [![Live Web Demo](https://img.shields.io/badge/Web_Demo-GitHub_Pages_(Nano_Tier)-green.svg)](https://corneliox.github.io/BlackFacedSpoonbill/)
 [![License](https://img.shields.io/badge/License-CC_BY--NC--SA_4.0-orange.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows_%7C_macOS_%7C_Linux-lightgrey.svg)](https://github.com/Corneliox/BlackFacedSpoonbill/releases)
@@ -29,7 +30,7 @@ Test the detection pipeline directly in your web browser:
 - **Scope**: Runs 100% client-side via ONNX Runtime WebAssembly/WebGL using the **YOLO11 Nano (11N)** model.
 - **Constraint**: To prevent excessive bandwidth and client compute overhead, high-resolution tiled inference (SAHI), batch multi-image processing, and large ablation models are restricted to the desktop software.
 
-### B. Desktop Studio v4.0.0 (Native Release Binaries)
+### B. Desktop Studio v4.0.0 (Stable Release Binaries)
 The native desktop application features the complete Photoshop-inspired analysis workstation, hardware auto-probing, dual-model comparison, and full-resolution panoramic census:
 
 | Operating System | Distribution Format | Download Link |
@@ -41,7 +42,19 @@ The native desktop application features the complete Photoshop-inspired analysis
 | **macOS Intel** | Native DMG (x86_64) | [Download Intel Mac DMG](https://github.com/Corneliox/BlackFacedSpoonbill/releases/download/v4.0.0/Spoonbill_Studio_v4.0.0_macOS_Intel_x64.dmg) |
 | **Linux (Universal)** | Compressed Tarball (.tar.gz) | [Download Linux Tarball](https://github.com/Corneliox/BlackFacedSpoonbill/releases/download/v4.0.0/Spoonbill_Studio_v4.0.0_Linux_x64.tar.gz) |
 
-Full release metadata and checksums are accessible at the [GitHub Releases Page](https://github.com/Corneliox/BlackFacedSpoonbill/releases/tag/v4.0.0).
+Full release metadata and checksums are accessible at the [GitHub Stable Release Page (v4.0.0)](https://github.com/Corneliox/BlackFacedSpoonbill/releases/tag/v4.0.0).
+
+### C. Desktop Studio v4.1.0-experimental (Pre-Release Preview)
+Version `v4.1.0-experimental` introduces a **Non-Destructive Floating Info Label (HUD)** and a dedicated **`Info Label` Inspector Tab**:
+- **Decoupled Detection Summary**: Telemetry (`Model | SAHI / Direct`, `Detected Count`, `Tiles Processed`, `Inference Speed (ms)`, `Mean Confidence`, `Image Dimensions`) is rendered as an interactive floating UI overlay rather than permanently burned into the image pixels.
+- **Dedicated `Info Label` Customization Tab**: Temporarily hide/restore the info box (`I` shortcut), toggle per-bird confidence tags (`T` shortcut), choose which telemetry rows appear, switch between 3 visual themes (`Classic Light Card`, `Dark Studio Glass`, `Minimal Compact Pill`), adjust opacity (`25%`–`100%`) and scale (`75%`–`125%`), snap to any corner or drag freely across the viewport, and optionally burn the customized HUD into exported images.
+
+| Operating System | Distribution Format | Download Link |
+| :--- | :--- | :--- |
+| **Windows 10 / 11** | Experimental Setup Wizard (.exe) | [Download v4.1.0 Experimental Setup](https://github.com/Corneliox/BlackFacedSpoonbill/releases/download/v4.1.0-experimental/Spoonbill_Studio_v4.1.0_Experimental_Setup.exe) |
+| **Windows 10 / 11** | Experimental Portable (.zip) | [Download v4.1.0 Experimental ZIP](https://github.com/Corneliox/BlackFacedSpoonbill/releases/download/v4.1.0-experimental/Spoonbill_Studio_v4.1.0_Experimental_Windows_x64.zip) |
+
+Explore the pre-release notes at the [GitHub Experimental Release Page (v4.1.0-experimental)](https://github.com/Corneliox/BlackFacedSpoonbill/releases/tag/v4.1.0-experimental).
 
 ---
 

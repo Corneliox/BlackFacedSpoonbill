@@ -945,7 +945,7 @@ class UnifiedSpoonbillEngine:
         draw_boxes: bool = True,
         draw_masks: bool = True,
         draw_labels: bool = True,
-        draw_hud: bool = True
+        draw_hud: bool = False
     ) -> np.ndarray:
         vis = image.copy()
         overlay = image.copy()

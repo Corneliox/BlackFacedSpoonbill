@@ -9,7 +9,7 @@ const { execSync } = require('child_process');
 
 const ROOT_DIR = __dirname;
 const ELECTRON_DIST = path.join(ROOT_DIR, 'node_modules', 'electron', 'dist');
-const OUTPUT_DIR = path.join(ROOT_DIR, 'dist', 'Spoonbill_Studio_v4.0.0_Windows_x64');
+const OUTPUT_DIR = path.join(ROOT_DIR, 'dist', 'Spoonbill_Studio_v4.1.0_Experimental_Windows_x64');
 const APP_DEST = path.join(OUTPUT_DIR, 'resources', 'app');
 
 function copyRecursiveSync(src, dest) {
@@ -75,9 +75,9 @@ console.log('[Packager] Creating helper scripts (shortcut creator, launcher)...'
 const startBat = `@echo off
 setlocal
 cd /d "%~dp0"
-title Spoonbill AI Studio V4
+title Spoonbill AI Studio v4.1 (Experimental)
 echo ===================================================================
-echo   Spoonbill AI Studio V4 (Photoshop Warehouse Edition)
+echo   Spoonbill AI Studio v4.1 (Experimental - Non-Destructive Info HUD)
 echo   Platalea minor Census & Research Suite
 echo ===================================================================
 echo [1/2] Verifying Python environment...
@@ -105,24 +105,14 @@ const installShortcutBat = `@echo off
 setlocal
 cd /d "%~dp0"
 echo ===================================================================
-echo   Creating Desktop Shortcut for Spoonbill AI Studio V4...
+echo   Creating Desktop Shortcut for Spoonbill AI Studio v4.1...
 echo ===================================================================
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut([System.IO.Path]::Combine([System.Environment]::GetFolderPath('Desktop'), 'Spoonbill AI Studio.lnk')); $s.TargetPath = '%~dp0Spoonbill_Studio.exe'; $s.WorkingDirectory = '%~dp0'; $s.Description = 'Black-Faced Spoonbill AI Studio V4 (Photoshop Edition)'; $s.Save(); Write-Host '[SUCCESS] Desktop shortcut created successfully!'"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut([System.IO.Path]::Combine([System.Environment]::GetFolderPath('Desktop'), 'Spoonbill AI Studio.lnk')); $s.TargetPath = '%~dp0Spoonbill_Studio.exe'; $s.WorkingDirectory = '%~dp0'; $s.Description = 'Black-Faced Spoonbill AI Studio v4.1 (Experimental)'; $s.Save(); Write-Host '[SUCCESS] Desktop shortcut created successfully!'"
 echo.
 echo You can now launch Spoonbill AI Studio directly from your Desktop.
 pause
 `;
 fs.writeFileSync(path.join(OUTPUT_DIR, 'Install_Desktop_Shortcut.bat'), installShortcutBat);
-
-console.log('[Packager] Creating Portable ZIP archive...');
-const zipTarget = path.join(ROOT_DIR, 'dist', 'Spoonbill_Studio_v4.0.0_Windows_x64.zip');
-try {
-  if (fs.existsSync(zipTarget)) fs.unlinkSync(zipTarget);
-  execSync(`powershell -NoProfile -Command "Compress-Archive -Path '${OUTPUT_DIR}\\*' -DestinationPath '${zipTarget}' -Force"`, { stdio: 'inherit' });
-  console.log(`[Packager] ZIP created: ${zipTarget}`);
-} catch (e) {
-  console.warn('[Packager] Could not create zip archive automatically:', e.message);
-}
 
 console.log('[Packager] Build complete!');
 console.log(`[Packager] Standalone app directory: ${OUTPUT_DIR}`);

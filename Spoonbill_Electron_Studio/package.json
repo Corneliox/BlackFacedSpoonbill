@@ -1,7 +1,7 @@
 {
   "name": "spoonbill-electron-studio",
-  "version": "4.0.0",
-  "description": "Black-Faced Spoonbill (Platalea minor) Unified AI Studio — Electron Desktop Edition (V4)",
+  "version": "4.1.0-experimental",
+  "description": "Black-Faced Spoonbill (Platalea minor) Unified AI Studio — Electron Desktop Edition (V4.1 Experimental)",
   "main": "main.js",
   "scripts": {
     "start": "electron ."

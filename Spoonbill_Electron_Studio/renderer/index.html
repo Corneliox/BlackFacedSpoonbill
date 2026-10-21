@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Spoonbill Studio</title>
+  <title>Spoonbill Studio v4.1 (Experimental)</title>
   <link rel="stylesheet" href="/renderer/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,6 +23,7 @@
           </svg>
         </div>
         <span class="ps-app-name">Spoonbill Studio</span>
+        <span class="ps-exp-badge" title="Version 4.1.0 Experimental Build — Non-Destructive Customizable Info HUD">v4.1 EXP</span>
         <span class="ps-divider">/</span>
         <span class="ps-file-tag" id="top-filename">101.jpg</span>
       </div>
@@ -77,6 +78,13 @@
         <button class="tool-btn active" id="tool-box" title="Toggle Bounding Boxes (B)">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
         </button>
+        <button class="tool-btn active" id="tool-tag" title="Toggle Per-Bird Confidence Tags (T)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+        </button>
+        <div class="tool-separator"></div>
+        <button class="tool-btn active" id="tool-hud" title="Show / Hide Floating Info Box Temporarily (I)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="14" y2="12"/><line x1="7" y1="16" x2="11" y2="16"/></svg>
+        </button>
       </aside>
 
       <!-- B. CANVAS VIEWPORT (PRIMARY FOCUS) -->
@@ -91,6 +99,45 @@
         </div>
 
         <canvas id="studio-canvas"></canvas>
+
+        <!-- NON-DESTRUCTIVE FLOATING SPOONBILL INFO BOX (V4.1 EXPERIMENTAL) -->
+        <div class="spoonbill-info-hud theme-light pos-top-left" id="floating-info-hud" title="Drag to reposition anywhere on canvas">
+          <div class="info-hud-accent"></div>
+          <div class="info-hud-content">
+            <div class="info-hud-top-row" id="hud-row-top">
+              <span class="info-hud-model" id="info-hud-model">11N V3 (ONNX)</span>
+              <span class="info-hud-pipe" id="info-hud-pipe">|</span>
+              <span class="info-hud-mode" id="info-hud-mode">SAHI (TILED)</span>
+            </div>
+            <div class="info-hud-main-row" id="hud-row-count">
+              <span>Detected: <strong id="info-hud-count">0</strong> Spoonbills</span>
+            </div>
+            <div class="info-hud-meta-row" id="hud-row-meta">
+              <span id="info-hud-tiles">Tiles: 1</span>
+              <span class="meta-sep" id="sep-tiles">·</span>
+              <span id="info-hud-latency">0.0 ms</span>
+              <span class="meta-sep" id="sep-latency">·</span>
+              <span id="info-hud-conf">Conf: 0.0%</span>
+              <span class="meta-sep" id="sep-conf">·</span>
+              <span id="info-hud-res">0×0</span>
+            </div>
+            <div class="info-hud-note-row hidden" id="hud-row-note"></div>
+          </div>
+          <div class="info-hud-actions no-drag">
+            <button class="hud-act-btn" id="btn-hud-customize" title="Customize Info Box Fields &amp; Style">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
+            <button class="hud-act-btn" id="btn-hud-hide" title="Temporarily Hide Info Box (Press I to restore)">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Subtle Restore Pill when Info Box is Hidden Temporarily -->
+        <button class="hud-restore-pill hidden" id="btn-hud-restore" title="Click to show the Spoonbill Info Box again (Shortcut: I)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="14" y2="12"/></svg>
+          <span>Show Info Label</span>
+        </button>
 
         <!-- Status footer on canvas -->
         <div class="ps-canvas-hud">
@@ -176,82 +223,213 @@
           </button>
         </div>
 
-        <!-- 2. MODEL SELECTOR -->
-        <div class="ps-section">
-          <label class="section-label">AI Model</label>
-          <select id="select-model" class="ps-select"></select>
-          <div class="model-badge-row">
-            <span class="badge-text" id="badge-tech">27.6M · ONNX FP32</span>
-            <span class="badge-tag" id="badge-target">Crowds &amp; Panorama</span>
-          </div>
-          <div id="model-warning-container" style="display: none; margin-top: 6px;">
-            <span class="model-badge-warn" id="model-warning-badge">⚠️ Disarankan NVIDIA GPU (Beban CPU Tinggi)</span>
-          </div>
+        <!-- 2. INSPECTOR TAB SWITCHER (DETECTION vs INFO LABEL CUSTOMIZER) -->
+        <div class="inspector-tab-bar">
+          <button class="itab-btn active" data-itab="detect" id="tab-btn-detect">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+            <span>Model &amp; SAHI</span>
+          </button>
+          <button class="itab-btn" data-itab="hud" id="tab-btn-hud">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><line x1="7" y1="12" x2="13" y2="12"/></svg>
+            <span>Info Label</span>
+            <span class="itab-badge">NEW</span>
+          </button>
         </div>
 
-        <!-- 3. PRIMARY CONTROLS (CONFIDENCE & PRESETS) -->
-        <div class="ps-section">
-          <div class="label-row">
-            <label class="section-label">Confidence</label>
-            <span class="value-text" id="conf-val-text">25%</span>
-          </div>
-          <input type="range" id="rng-conf" min="5" max="95" step="5" value="25" class="ps-slider">
+        <!-- ================= TAB PANE 1: MODEL & SAHI DETECTION ================= -->
+        <div class="inspector-tab-pane" id="itab-detect">
 
-          <div class="compact-presets">
-            <button class="preset-pill active" data-p="panorama" title="SAHI On, 640px ubin">Panorama</button>
-            <button class="preset-pill" data-p="wetland" title="CoordAtt @ P3 anti-pantulan air">Wetland</button>
-            <button class="preset-pill" data-p="fast" title="Direct pass cepat">Fast</button>
+          <!-- MODEL SELECTOR -->
+          <div class="ps-section">
+            <label class="section-label">AI Model</label>
+            <select id="select-model" class="ps-select"></select>
+            <div class="model-badge-row">
+              <span class="badge-text" id="badge-tech">27.6M · ONNX FP32</span>
+              <span class="badge-tag" id="badge-target">Crowds &amp; Panorama</span>
+            </div>
+            <div id="model-warning-container" style="display: none; margin-top: 6px;">
+              <span class="model-badge-warn" id="model-warning-badge">Disarankan NVIDIA GPU (Beban CPU Tinggi)</span>
+            </div>
           </div>
+
+          <!-- PRIMARY CONTROLS (CONFIDENCE & PRESETS) -->
+          <div class="ps-section">
+            <div class="label-row">
+              <label class="section-label">Confidence</label>
+              <span class="value-text" id="conf-val-text">25%</span>
+            </div>
+            <input type="range" id="rng-conf" min="5" max="95" step="5" value="25" class="ps-slider">
+
+            <div class="compact-presets">
+              <button class="preset-pill active" data-p="panorama" title="SAHI On, 640px ubin">Panorama</button>
+              <button class="preset-pill" data-p="wetland" title="CoordAtt @ P3 anti-pantulan air">Wetland</button>
+              <button class="preset-pill" data-p="fast" title="Direct pass cepat">Fast</button>
+            </div>
+          </div>
+
+          <!-- ADVANCED ACCORDION (COLLAPSIBLE - ZERO CLUTTER) -->
+          <details class="ps-section ps-accordion">
+            <summary>
+              <span>Advanced SAHI Tiling</span>
+              <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </summary>
+            <div class="accordion-body">
+              <label class="ps-toggle-row">
+                <span>Enable SAHI Tiling</span>
+                <input type="checkbox" id="chk-sahi" checked>
+                <span class="toggle-ui"></span>
+              </label>
+
+              <div class="label-row" style="margin-top:8px;">
+                <span class="sub-label">Tile Size</span>
+                <span class="value-text" id="tile-val-text">640 px</span>
+              </div>
+              <input type="range" id="rng-tile" min="320" max="1280" step="32" value="640" class="ps-slider">
+
+              <div class="label-row" style="margin-top:8px;">
+                <span class="sub-label">Tile Overlap</span>
+                <span class="value-text" id="overlap-val-text">20%</span>
+              </div>
+              <input type="range" id="rng-overlap" min="5" max="50" step="5" value="20" class="ps-slider">
+
+              <div class="label-row" style="margin-top:8px;">
+                <span class="sub-label">NMS IoU</span>
+                <span class="value-text" id="iou-val-text">0.45</span>
+              </div>
+              <input type="range" id="rng-iou" min="10" max="90" step="5" value="45" class="ps-slider">
+            </div>
+          </details>
+
+          <!-- DETECTIONS LIST ACCORDION (COMPACT) -->
+          <details class="ps-section ps-accordion" open>
+            <summary>
+              <span>Instances (<span id="instances-count-tab">0</span>)</span>
+              <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </summary>
+            <div class="accordion-body" style="padding:4px 0 0 0;">
+              <div class="instance-list" id="instance-list">
+                <span class="list-empty">No detections yet. Click Detect Spoonbills.</span>
+              </div>
+            </div>
+          </details>
+
         </div>
 
-        <!-- 4. ADVANCED ACCORDION (COLLAPSIBLE - ZERO CLUTTER) -->
-        <details class="ps-section ps-accordion">
-          <summary>
-            <span>Advanced SAHI Tiling</span>
-            <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-          </summary>
-          <div class="accordion-body">
-            <label class="ps-toggle-row">
-              <span>Enable SAHI Tiling</span>
-              <input type="checkbox" id="chk-sahi" checked>
+        <!-- ================= TAB PANE 2: INFO LABEL & HUD CUSTOMIZER ================= -->
+        <div class="inspector-tab-pane hidden" id="itab-hud">
+
+          <!-- 1. VISIBILITY & NON-DESTRUCTIVE MODE -->
+          <div class="ps-section">
+            <div class="label-row">
+              <label class="section-label">Info Box Visibility</label>
+              <span class="badge-tag">Non-Destructive</span>
+            </div>
+
+            <label class="ps-toggle-row" style="margin-top:2px;">
+              <span>Show Spoonbill Info Box (HUD)</span>
+              <input type="checkbox" id="chk-hud-visible" checked>
               <span class="toggle-ui"></span>
             </label>
 
-            <div class="label-row" style="margin-top:8px;">
-              <span class="sub-label">Tile Size</span>
-              <span class="value-text" id="tile-val-text">640 px</span>
-            </div>
-            <input type="range" id="rng-tile" min="320" max="1280" step="32" value="640" class="ps-slider">
+            <label class="ps-toggle-row" style="margin-top:4px;">
+              <span>Show Per-Bird Confidence Tags</span>
+              <input type="checkbox" id="chk-bird-tags" checked>
+              <span class="toggle-ui"></span>
+            </label>
 
-            <div class="label-row" style="margin-top:8px;">
-              <span class="sub-label">Tile Overlap</span>
-              <span class="value-text" id="overlap-val-text">20%</span>
+            <div class="label-row" style="margin-top:6px;">
+              <span class="sub-label">Render Mode</span>
             </div>
-            <input type="range" id="rng-overlap" min="5" max="50" step="5" value="20" class="ps-slider">
-
-            <div class="label-row" style="margin-top:8px;">
-              <span class="sub-label">NMS IoU</span>
-              <span class="value-text" id="iou-val-text">0.45</span>
-            </div>
-            <input type="range" id="rng-iou" min="10" max="90" step="5" value="45" class="ps-slider">
+            <select id="select-hud-render-mode" class="ps-select">
+              <option value="floating" selected>Floating Viewport Label (Draggable)</option>
+              <option value="canvas">Pinned on Image Canvas (Zoomable)</option>
+            </select>
           </div>
-        </details>
 
-        <!-- 5. DETECTIONS LIST ACCORDION (COMPACT) -->
-        <details class="ps-section ps-accordion" open>
-          <summary>
-            <span>Instances (<span id="instances-count-tab">0</span>)</span>
-            <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-          </summary>
-          <div class="accordion-body" style="padding:4px 0 0 0;">
-            <div class="instance-list" id="instance-list">
-              <span class="list-empty">No detections yet. Click Detect Spoonbills.</span>
+          <!-- 2. POSITION & CORNER ANCHOR -->
+          <div class="ps-section">
+            <div class="label-row">
+              <label class="section-label">Box Position</label>
+              <button class="ps-link-btn" id="btn-hud-reset-pos" title="Reset dragged position to corner">Reset Position</button>
+            </div>
+            <div class="hud-pos-grid">
+              <button class="pos-pill active" data-pos="top-left">Top-Left</button>
+              <button class="pos-pill" data-pos="top-right">Top-Right</button>
+              <button class="pos-pill" data-pos="bottom-left">Bottom-Left</button>
+              <button class="pos-pill" data-pos="bottom-right">Bottom-Right</button>
             </div>
           </div>
-        </details>
 
-        <!-- 6. EXPORT ACTIONS -->
+          <!-- 3. CUSTOMIZABLE TELEMETRY ITEMS -->
+          <div class="ps-section">
+            <label class="section-label">Displayed Metrics &amp; Info</label>
+            <div class="hud-fields-checklist">
+              <label class="ps-check-row">
+                <input type="checkbox" id="chk-field-model" checked>
+                <span>Model Name (e.g. 11N V3 ONNX)</span>
+              </label>
+              <label class="ps-check-row">
+                <input type="checkbox" id="chk-field-mode" checked>
+                <span>SAHI Tiled / Direct Status</span>
+              </label>
+              <label class="ps-check-row">
+                <input type="checkbox" id="chk-field-count" checked>
+                <span>Detected Spoonbills Count</span>
+              </label>
+              <label class="ps-check-row">
+                <input type="checkbox" id="chk-field-tiles" checked>
+                <span>Tiles Processed Count</span>
+              </label>
+              <label class="ps-check-row">
+                <input type="checkbox" id="chk-field-latency" checked>
+                <span>Inference Speed (ms)</span>
+              </label>
+              <label class="ps-check-row">
+                <input type="checkbox" id="chk-field-conf" checked>
+                <span>Mean Confidence (%)</span>
+              </label>
+              <label class="ps-check-row">
+                <input type="checkbox" id="chk-field-res" checked>
+                <span>Image Dimensions (W×H)</span>
+              </label>
+            </div>
+
+            <div class="label-row" style="margin-top:6px;">
+              <span class="sub-label">Custom Survey / Location Note</span>
+            </div>
+            <input type="text" id="txt-hud-note" class="ps-text-input" placeholder="e.g. Tainan Wetland Site A (Optional)" maxlength="60">
+          </div>
+
+          <!-- 4. APPEARANCE, THEME & OPACITY -->
+          <div class="ps-section">
+            <label class="section-label">Theme &amp; Appearance</label>
+            <select id="select-hud-theme" class="ps-select">
+              <option value="light" selected>Classic Light Card (Terracotta Bar)</option>
+              <option value="dark">Dark Studio Glass (Sleek Dark)</option>
+              <option value="minimal">Minimal Compact Pill</option>
+            </select>
+
+            <div class="label-row" style="margin-top:6px;">
+              <span class="sub-label">Background Opacity</span>
+              <span class="value-text" id="hud-opacity-val">90%</span>
+            </div>
+            <input type="range" id="rng-hud-opacity" min="25" max="100" step="5" value="90" class="ps-slider">
+
+            <div class="label-row" style="margin-top:6px;">
+              <span class="sub-label">Label Scale</span>
+              <span class="value-text" id="hud-scale-val">100%</span>
+            </div>
+            <input type="range" id="rng-hud-scale" min="75" max="125" step="5" value="100" class="ps-slider">
+          </div>
+
+        </div>
+
+        <!-- 6. EXPORT ACTIONS (ALWAYS VISIBLE AT BOTTOM) -->
         <div class="ps-section export-box">
+          <label class="ps-check-row export-bake-row" title="Jika dicentang, kotak info akan ikut digambar ke dalam file gambar saat disimpan. Jika tidak dicentang, gambar tersimpan bersih tanpa kotak info.">
+            <input type="checkbox" id="chk-export-bake-hud">
+            <span>Attach Info Box on Saved Image</span>
+          </label>
           <button class="ps-btn secondary full" id="btn-export-img" disabled>Save Annotated Image</button>
           <div class="export-dual">
             <button class="ps-btn ghost" id="btn-export-csv" disabled>CSV</button>
@@ -289,7 +467,7 @@
 
       <div class="modal-body">
         <div class="hw-summary-banner" id="hw-summary-banner">
-          <div class="hw-status-icon" id="hw-status-icon">💻</div>
+          <div class="hw-status-icon" id="hw-status-icon">CPU</div>
           <div class="hw-status-info">
             <h4 id="hw-status-title">Detecting Hardware Environment...</h4>
             <p id="hw-status-desc">Scanning GPU vendors, driver version, and CUDA runtimes.</p>

@@ -39,9 +39,9 @@ except Exception:
     pass
 
 app = FastAPI(
-    title="Spoonbill Electron Studio V4 API",
+    title="Spoonbill Electron Studio V4.1 Experimental API",
     description="Unified AI Backend for Black-faced Spoonbill Instance Segmentation, Ablation & Census",
-    version="4.0.0"
+    version="4.1.0-experimental"
 )
 
 app.add_middleware(
@@ -97,7 +97,7 @@ async def serve_root():
     idx = os.path.join(RENDERER_DIR, "index.html")
     if os.path.exists(idx):
         return FileResponse(idx)
-    return HTMLResponse("<h2>Spoonbill Electron Studio V4 Backend Running</h2>")
+    return HTMLResponse("<h2>Spoonbill Electron Studio V4.1 Experimental Backend Running</h2>")
 
 
 @app.get("/api/health")
@@ -105,7 +105,7 @@ async def health_check():
     models = engine.get_available_models()
     return {
         "status": "healthy",
-        "version": "4.0.0",
+        "version": "4.1.0-experimental",
         "active_mode": engine.active_mode,
         "device": engine.device.upper(),
         "hw_info": engine.hw_info,
@@ -195,7 +195,8 @@ def predict_single(
     iou: float = Form(0.45),
     draw_boxes: bool = Form(True),
     draw_masks: bool = Form(True),
-    draw_labels: bool = Form(True)
+    draw_labels: bool = Form(True),
+    draw_hud: bool = Form(False)
 ):
     try:
         img, fname = load_image_from_request(file, sample_name)
@@ -214,7 +215,8 @@ def predict_single(
             res,
             draw_boxes=draw_boxes,
             draw_masks=draw_masks,
-            draw_labels=draw_labels
+            draw_labels=draw_labels,
+            draw_hud=draw_hud
         )
 
         formatted_dets = []
@@ -264,7 +266,8 @@ def compare_models_endpoint(
     slice_size: int = Form(640),
     overlap: float = Form(0.20),
     conf: float = Form(0.25),
-    iou: float = Form(0.45)
+    iou: float = Form(0.45),
+    draw_hud: bool = Form(False)
 ):
     """
     Runs Head-to-Head comparison between Model A and Model B (either Instance Segmentation or Grad-CAM Attribution).
@@ -279,8 +282,8 @@ def compare_models_endpoint(
             vis_a = engine.generate_gradcam_overlay(img, model_a)
             vis_b = engine.generate_gradcam_overlay(img, model_b)
         else:
-            vis_a = engine.visualize(img, res_a, draw_boxes=True, draw_masks=True, draw_labels=True)
-            vis_b = engine.visualize(img, res_b, draw_boxes=True, draw_masks=True, draw_labels=True)
+            vis_a = engine.visualize(img, res_a, draw_boxes=True, draw_masks=True, draw_labels=True, draw_hud=draw_hud)
+            vis_b = engine.visualize(img, res_b, draw_boxes=True, draw_masks=True, draw_labels=True, draw_hud=draw_hud)
 
         return {
             "success": True,
