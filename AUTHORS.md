@@ -1,21 +1,31 @@
 # Authors and Institutional Affiliations
 
-## Principal Researcher & Lead Architect
+## Principal Researchers & Authors
 
 - **Gilang Ramadhan**
   - Department of Computer Science and Information Engineering
   - Artificial Intelligence and Computer Vision Laboratory
   - Asia University, Taichung, Taiwan
-  - GitHub: [@Corneliox](https://github.com/Corneliox) / [@ghilangtr](https://github.com/ghilangtr)
-  - Role: Principal Investigator, Model Architecture Design, Dataset Curation, Cross-Platform Desktop Application Development.
+  - GitHub: [@ghilangtr](https://github.com/ghilangtr)
+  - Role: Principal Investigator, Model Architecture Design, Dataset Curation, Ecological Computer Vision.
+
+- **Cornelio Abdimash Christiono**
+  - Department of Computer Engineering
+  - Soegijapranata Catholic University, Semarang, Indonesia
+  - GitHub: [@Corneliox](https://github.com/Corneliox)
+  - Role: Lead System Architect, Cross-Platform Desktop Engineering, Distribution Pipeline & Optimization.
 
 ---
 
-## Academic & Research Affiliation
+## Academic & Research Affiliations
 
-- **Institution**: Asia University (AU), Taiwan
-- **Department**: Department of Computer Science and Information Engineering (CSIE)
-- **Field of Research**: Deep Learning, Fine-Grained Object Detection, Instance Segmentation, Ecological Computer Vision, Edge Acceleration.
+1. **Asia University (AU), Taiwan**
+   - Department of Computer Science and Information Engineering (CSIE)
+   - Field of Research: Deep Learning, Fine-Grained Object Detection, Instance Segmentation, Ecological Computer Vision, Edge Acceleration.
+
+2. **Soegijapranata Catholic University (SCU), Indonesia**
+   - Department of Computer Engineering
+   - Field of Research: Computer Engineering, Embedded Systems, Cross-Platform Desktop Architecture, AI Deployment Pipelines.
 
 ---
 

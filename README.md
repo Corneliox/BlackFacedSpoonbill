@@ -157,7 +157,12 @@ npm start
   - Department of Computer Science and Information Engineering
   - Artificial Intelligence and Computer Vision Laboratory
   - Asia University, Taichung, Taiwan
-  - GitHub: [@Corneliox](https://github.com/Corneliox) / [@ghilangtr](https://github.com/ghilangtr)
+  - GitHub: [@ghilangtr](https://github.com/ghilangtr)
+
+- **Cornelio Abdimash Christiono**
+  - Department of Computer Engineering
+  - Soegijapranata Catholic University, Semarang, Indonesia
+  - GitHub: [@Corneliox](https://github.com/Corneliox)
 
 For full institutional affiliations and contributor profiles, refer to [AUTHORS.md](AUTHORS.md).
 
@@ -169,28 +174,28 @@ If you utilize this codebase, trained model checkpoints, desktop application, or
 
 ### BibTeX
 ```bibtex
-@software{ramadhan2026spoonbill,
-  author       = {Gilang Ramadhan},
+@software{ramadhan_christiono_2026_spoonbill,
+  author       = {Gilang Ramadhan and Cornelio Abdimash Christiono},
   title        = {{Black-Faced Spoonbill AI Detection \& Instance Segmentation Project: Automated Census and Attention-Guided Instance Segmentation for Platalea minor}},
   year         = {2026},
   version      = {4.1.0},
   publisher    = {GitHub},
-  institution  = {Department of Computer Science and Information Engineering, Asia University, Taiwan},
+  institution  = {Asia University, Taiwan and Soegijapranata Catholic University, Indonesia},
   url          = {https://github.com/Corneliox/BlackFacedSpoonbill}
 }
 ```
 
 ### APA (7th Edition)
-> Ramadhan, G. (2026). *Black-Faced Spoonbill AI Detection & Instance Segmentation Project: Automated Census and Attention-Guided Instance Segmentation for Platalea minor* (Version 4.1.0) [Computer software]. GitHub. https://github.com/Corneliox/BlackFacedSpoonbill
+> Ramadhan, G., & Christiono, C. A. (2026). *Black-Faced Spoonbill AI Detection & Instance Segmentation Project: Automated Census and Attention-Guided Instance Segmentation for Platalea minor* (Version 4.1.0) [Computer software]. GitHub. https://github.com/Corneliox/BlackFacedSpoonbill
 
 ### IEEE Style
-> G. Ramadhan, "Black-Faced Spoonbill AI Detection & Instance Segmentation Project: Automated Census and Attention-Guided Instance Segmentation for Platalea minor," version 4.1.0, Department of Computer Science and Information Engineering, Asia University, Taiwan, 2026. [Online]. Available: https://github.com/Corneliox/BlackFacedSpoonbill
+> G. Ramadhan and C. A. Christiono, "Black-Faced Spoonbill AI Detection & Instance Segmentation Project: Automated Census and Attention-Guided Instance Segmentation for Platalea minor," version 4.1.0, Asia University, Taiwan and Soegijapranata Catholic University, Indonesia, 2026. [Online]. Available: https://github.com/Corneliox/BlackFacedSpoonbill
 
 ### Harvard Style
-> Ramadhan, G., 2026. *Black-Faced Spoonbill AI Detection & Instance Segmentation Project* (Version 4.1.0). [software] Asia University, Taiwan. Available at: <https://github.com/Corneliox/BlackFacedSpoonbill> [Accessed 22 October 2026].
+> Ramadhan, G. and Christiono, C.A., 2026. *Black-Faced Spoonbill AI Detection & Instance Segmentation Project* (Version 4.1.0). [software] Asia University, Taiwan & Soegijapranata Catholic University, Indonesia. Available at: <https://github.com/Corneliox/BlackFacedSpoonbill> [Accessed 22 October 2026].
 
 ### Chicago Manual of Style
-> Ramadhan, Gilang. 2026. "Black-Faced Spoonbill AI Detection & Instance Segmentation Project." Version 4.1.0. GitHub. https://github.com/Corneliox/BlackFacedSpoonbill.
+> Ramadhan, Gilang, and Cornelio Abdimash Christiono. 2026. "Black-Faced Spoonbill AI Detection & Instance Segmentation Project." Version 4.1.0. GitHub. https://github.com/Corneliox/BlackFacedSpoonbill.
 
 ---
 

@@ -10,6 +10,9 @@ authors:
   - family-names: "Ramadhan"
     given-names: "Gilang"
     affiliation: "Department of Computer Science and Information Engineering, Asia University, Taiwan"
+  - family-names: "Christiono"
+    given-names: "Cornelio Abdimash"
+    affiliation: "Department of Computer Engineering, Soegijapranata Catholic University, Indonesia"
 keywords:
   - "black-faced spoonbill"
   - "platalea minor"
@@ -35,10 +38,13 @@ preferred-citation:
     - family-names: "Ramadhan"
       given-names: "Gilang"
       affiliation: "Department of Computer Science and Information Engineering, Asia University, Taiwan"
+    - family-names: "Christiono"
+      given-names: "Cornelio Abdimash"
+      affiliation: "Department of Computer Engineering, Soegijapranata Catholic University, Indonesia"
   title: "Black-Faced Spoonbill AI Detection & Instance Segmentation Project: Automated Census and Attention-Guided Instance Segmentation for Platalea minor"
   version: "4.1.0"
   year: 2026
   date-released: "2026-10-22"
   url: "https://github.com/Corneliox/BlackFacedSpoonbill"
   institution:
-    name: "Asia University, Taiwan"
+    name: "Asia University, Taiwan & Soegijapranata Catholic University, Indonesia"

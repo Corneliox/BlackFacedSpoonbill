@@ -16,7 +16,7 @@
     "black-faced-spoonbill",
     "instance-segmentation"
   ],
-  "author": "Gilang Ramadhan - Asia University, Taiwan",
+  "author": "Gilang Ramadhan (Asia University) & Cornelio Abdimash Christiono (Soegijapranata Catholic University)",
   "license": "CC-BY-NC-SA-4.0",
   "devDependencies": {
     "electron": "^33.2.0"

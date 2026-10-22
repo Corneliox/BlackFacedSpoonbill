@@ -46,13 +46,13 @@ Spoonbill AI Studio version 4.1.0 represents a major UX and architectural enhanc
 When citing this work or software in research publications, please refer to [CITATION.cff](CITATION.cff) or format as:
 
 ```bibtex
-@software{ramadhan2026spoonbill,
-  author       = {Gilang Ramadhan},
+@software{ramadhan_christiono_2026_spoonbill,
+  author       = {Gilang Ramadhan and Cornelio Abdimash Christiono},
   title        = {{Black-Faced Spoonbill AI Detection \& Instance Segmentation Project: Automated Census and Attention-Guided Instance Segmentation for Platalea minor}},
   year         = {2026},
   version      = {4.1.0},
   publisher    = {GitHub},
-  institution  = {Department of Computer Science and Information Engineering, Asia University, Taiwan},
+  institution  = {Asia University, Taiwan and Soegijapranata Catholic University, Indonesia},
   url          = {https://github.com/Corneliox/BlackFacedSpoonbill}
 }
 ```
