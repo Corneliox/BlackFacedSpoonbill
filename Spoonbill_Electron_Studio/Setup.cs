@@ -8,6 +8,8 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Diagnostics;
 using System.Threading;
+using System.Collections.Generic;
+using System.Security.Principal;
 using Microsoft.Win32;
 
 public class BufferedPanel : Panel
@@ -436,8 +438,8 @@ public class SpoonbillNvidiaInstaller : Form
         this.DoubleBuffered = true;
         this.SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
 
-        string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        targetDir = Path.Combine(localApp, "Programs", "Spoonbill_Studio");
+        string progFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        targetDir = Path.Combine(progFiles, "Spoonbill_Studio");
 
         BuildTwoColumnLayout();
         SwitchStep(0);
@@ -1322,8 +1324,8 @@ public class SpoonbillNvidiaInstaller : Form
 
         if (!customEnabled)
         {
-            string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            targetDir = Path.Combine(localApp, "Programs", "Spoonbill_Studio");
+            string progFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+            targetDir = Path.Combine(progFiles, "Spoonbill_Studio");
             txtTargetDir.Text = targetDir;
             chkCleanInstall.Checked = true;
             chkInstallModels.Checked = true;
@@ -1357,7 +1359,7 @@ public class SpoonbillNvidiaInstaller : Form
         using (FolderBrowserDialog fbd = new FolderBrowserDialog())
         {
             fbd.Description = "Select Installation Directory for Spoonbill AI Studio V4";
-            fbd.SelectedPath = Directory.Exists(targetDir) ? targetDir : Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            fbd.SelectedPath = Directory.Exists(targetDir) ? targetDir : Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
             if (fbd.ShowDialog(this) == DialogResult.OK)
             {
                 targetDir = fbd.SelectedPath;
@@ -1557,20 +1559,24 @@ public class SpoonbillNvidiaInstaller : Form
             sysCardBadges[3].BackColor = Color.FromArgb(52, 18, 18);
         }
 
-        // 5. Prior Installation Detection
+        // 5. Prior Installation Detection (Program Files & Legacy AppData)
         existingInstallDir = DetectExistingInstallation();
         existingVersionDetected = !string.IsNullOrEmpty(existingInstallDir);
         if (existingVersionDetected)
         {
-            sysCardValues[4].Text = "Detected (" + FormatCompactPath(existingInstallDir) + ")";
-            sysCardBadges[4].Text = "UPGRADE READY";
+            bool hasLegacy = allExistingInstalls.Exists(p => p.IndexOf("AppData", StringComparison.OrdinalIgnoreCase) >= 0);
+            string locLabel = hasLegacy ? "Legacy AppData" : "Program Files";
+            if (allExistingInstalls.Count > 1) locLabel = "Multiple locations (" + allExistingInstalls.Count + ")";
+
+            sysCardValues[4].Text = "Detected " + locLabel + " (" + FormatCompactPath(existingInstallDir) + ")";
+            sysCardBadges[4].Text = hasLegacy ? "MIGRATE TO PROGRAM FILES" : "UPGRADE READY";
             sysCardBadges[4].ForeColor = Color.FromArgb(251, 146, 60);
             sysCardBadges[4].BackColor = Color.FromArgb(46, 28, 12);
             btnRemoveExisting.Visible = true;
         }
         else
         {
-            sysCardValues[4].Text = "No prior installation found (Clean target directory)";
+            sysCardValues[4].Text = "No prior installation found (Clean target directory in Program Files)";
             sysCardBadges[4].Text = "CLEAN TARGET";
             sysCardBadges[4].ForeColor = ClrNvidiaGreen;
             sysCardBadges[4].BackColor = Color.FromArgb(24, 38, 16);
@@ -1594,8 +1600,10 @@ public class SpoonbillNvidiaInstaller : Form
             lblAdvisoryTitle.Text = "All System Prerequisites Ready for Deployment";
             lblAdvisoryTitle.ForeColor = ClrNvidiaGreen;
             string upgradeNote = existingVersionDetected
-                ? " Prior build detected and will be cleanly upgraded."
-                : " Ready for Express or Custom installation.";
+                ? (allExistingInstalls.Exists(p => p.IndexOf("AppData", StringComparison.OrdinalIgnoreCase) >= 0)
+                    ? " Legacy AppData build detected and will be safely migrated to Program Files."
+                    : " Prior Program Files build detected and will be cleanly upgraded.")
+                : " Ready for Express or Custom installation in Program Files.";
             lblAdvisoryDesc.Text = "Hardware and Python runtime verified." + upgradeNote + " Click 'Next >' to review the License Agreement.";
             pnlSysAdvisory.BackColor = Color.FromArgb(18, 32, 14);
             btnHowToReady.ButtonText = "Setup & Hardware Guide";
@@ -1611,6 +1619,11 @@ public class SpoonbillNvidiaInstaller : Form
     private string FormatCompactPath(string fullPath)
     {
         if (string.IsNullOrEmpty(fullPath)) return "";
+        string progFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        if (!string.IsNullOrEmpty(progFiles) && fullPath.StartsWith(progFiles, StringComparison.OrdinalIgnoreCase))
+        {
+            return "%PROGRAMFILES%" + fullPath.Substring(progFiles.Length);
+        }
         string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         if (!string.IsNullOrEmpty(localApp) && fullPath.StartsWith(localApp, StringComparison.OrdinalIgnoreCase))
         {
@@ -1619,38 +1632,138 @@ public class SpoonbillNvidiaInstaller : Form
         return fullPath;
     }
 
+    private List<string> allExistingInstalls = new List<string>();
+
+    private List<string> DetectAllExistingInstallations()
+    {
+        List<string> found = new List<string>();
+        Action<string> addIfValid = (dir) => {
+            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+            {
+                if (File.Exists(Path.Combine(dir, "Spoonbill_Studio.exe")) || File.Exists(Path.Combine(dir, "Uninstall.exe")))
+                {
+                    string full = Path.GetFullPath(dir).TrimEnd('\\');
+                    if (!found.Exists(f => string.Equals(f, full, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        found.Add(full);
+                    }
+                }
+            }
+        };
+
+        // 1. Check Registry (Machine and User, plus Wow6432Node)
+        string[] rootKeys = new string[] {
+            @"Software\Microsoft\Windows\CurrentVersion\Uninstall\SpoonbillAIStudio",
+            @"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\SpoonbillAIStudio"
+        };
+        foreach (string rk in rootKeys)
+        {
+            try
+            {
+                using (RegistryKey k = Registry.LocalMachine.OpenSubKey(rk))
+                {
+                    if (k != null)
+                    {
+                        object loc = k.GetValue("InstallLocation");
+                        if (loc != null) addIfValid(loc.ToString());
+                    }
+                }
+            }
+            catch {}
+            try
+            {
+                using (RegistryKey k = Registry.CurrentUser.OpenSubKey(rk))
+                {
+                    if (k != null)
+                    {
+                        object loc = k.GetValue("InstallLocation");
+                        if (loc != null) addIfValid(loc.ToString());
+                    }
+                }
+            }
+            catch {}
+        }
+
+        // 2. Check Standard Program Files Location
+        string progFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        addIfValid(Path.Combine(progFiles, "Spoonbill_Studio"));
+
+        // 3. Check Legacy AppData Locations
+        string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        addIfValid(Path.Combine(localApp, "Programs", "Spoonbill_Studio"));
+        addIfValid(Path.Combine(localApp, "Spoonbill_Studio"));
+
+        return found;
+    }
+
     private string DetectExistingInstallation()
     {
         try
         {
-            if (Directory.Exists(targetDir) && File.Exists(Path.Combine(targetDir, "Spoonbill_Studio.exe")))
+            allExistingInstalls = DetectAllExistingInstallations();
+            if (allExistingInstalls.Count > 0)
             {
-                return targetDir;
-            }
-            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\SpoonbillAIStudio"))
-            {
-                if (key != null)
-                {
-                    object loc = key.GetValue("InstallLocation");
-                    if (loc != null && Directory.Exists(loc.ToString()))
-                    {
-                        return loc.ToString();
-                    }
-                }
+                return allExistingInstalls[0];
             }
         }
         catch {}
         return null;
     }
 
+    private void PurgeDirectorySafely(string dir)
+    {
+        if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) return;
+        try
+        {
+            foreach (string file in Directory.GetFiles(dir, "*", SearchOption.AllDirectories))
+            {
+                try { File.SetAttributes(file, FileAttributes.Normal); File.Delete(file); } catch {}
+            }
+            foreach (string subDir in Directory.GetDirectories(dir))
+            {
+                try { Directory.Delete(subDir, true); } catch {}
+            }
+            try { Directory.Delete(dir, true); } catch {}
+        }
+        catch {}
+    }
+
+    private void CleanAllShortcutsAndRegistries()
+    {
+        string[] lnkDirs = new string[] {
+            Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu), "Programs")
+        };
+        foreach (string d in lnkDirs)
+        {
+            try
+            {
+                if (Directory.Exists(d))
+                {
+                    string p = Path.Combine(d, "Spoonbill AI Studio.lnk");
+                    if (File.Exists(p)) { File.Delete(p); }
+                }
+            }
+            catch {}
+        }
+        try { Registry.LocalMachine.DeleteSubKeyTree(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\SpoonbillAIStudio", false); } catch {}
+        try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\SpoonbillAIStudio", false); } catch {}
+    }
+
     private void OnQuickRemoveExistingClick(object sender, EventArgs e)
     {
-        string dirToClean = existingInstallDir ?? targetDir;
+        List<string> toClean = (allExistingInstalls != null && allExistingInstalls.Count > 0)
+            ? allExistingInstalls
+            : new List<string> { existingInstallDir ?? targetDir };
+
+        string pathsDisplay = string.Join("\n• ", toClean.ConvertAll(p => FormatCompactPath(p)).ToArray());
         DialogResult res = MessageBox.Show(
             this,
-            "An existing Spoonbill AI Studio installation was detected at:\n" + dirToClean + "\n\n" +
-            "Would you like to completely remove the previous installation and its shortcuts right now?\n" +
-            "(Note: Continuing with normal setup will also automatically perform a Clean Upgrade.)",
+            "Existing Spoonbill AI Studio installation(s) were detected at:\n• " + pathsDisplay + "\n\n" +
+            "Would you like to completely remove the previous installation(s) and their shortcuts right now?\n" +
+            "(Note: Continuing with normal setup will also automatically perform a Clean Upgrade into Program Files.)",
             "Uninstall Existing Build",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Question
@@ -1660,21 +1773,13 @@ public class SpoonbillNvidiaInstaller : Form
             try
             {
                 KillRunningProcesses();
-                if (Directory.Exists(dirToClean))
+                foreach (string dir in toClean)
                 {
-                    foreach (string file in Directory.GetFiles(dirToClean, "*", SearchOption.AllDirectories))
-                    {
-                        try { File.SetAttributes(file, FileAttributes.Normal); File.Delete(file); } catch {}
-                    }
-                    try { Directory.Delete(dirToClean, true); } catch {}
+                    PurgeDirectorySafely(dir);
                 }
-                string desktopLnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Spoonbill AI Studio.lnk");
-                if (File.Exists(desktopLnk)) { try { File.Delete(desktopLnk); } catch {} }
-                string startMenuLnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs", "Spoonbill AI Studio.lnk");
-                if (File.Exists(startMenuLnk)) { try { File.Delete(startMenuLnk); } catch {} }
-                try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\SpoonbillAIStudio", false); } catch {}
+                CleanAllShortcutsAndRegistries();
 
-                MessageBox.Show(this, "Previous installation and shortcuts have been cleanly removed.", "Removed Successfully", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(this, "Previous installation(s) and shortcuts have been cleanly removed.", "Removed Successfully", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 RunSystemCheck();
             }
             catch (Exception ex)
@@ -1824,36 +1929,26 @@ public class SpoonbillNvidiaInstaller : Form
             AppendLog("Target Directory: " + targetDir);
 
             bool doClean = (installMode == 0) || chkCleanInstall.Checked;
-            if (doClean && Directory.Exists(targetDir))
+            if (doClean)
             {
                 UpdateStatus("Phase 1/4: Stopping active studio processes and purging old build...", 10);
                 AppendLog("Stopping any running Spoonbill_Studio processes...");
                 KillRunningProcesses();
 
-                AppendLog("Purging previous installation files in target directory...");
-                int removedCount = 0;
-                try
+                List<string> installsToPurge = DetectAllExistingInstallations();
+                if (!installsToPurge.Exists(d => string.Equals(d, targetDir, StringComparison.OrdinalIgnoreCase)))
                 {
-                    foreach (string file in Directory.GetFiles(targetDir, "*", SearchOption.AllDirectories))
-                    {
-                        try
-                        {
-                            File.SetAttributes(file, FileAttributes.Normal);
-                            File.Delete(file);
-                            removedCount++;
-                        }
-                        catch {}
-                    }
-                    foreach (string dir in Directory.GetDirectories(targetDir))
-                    {
-                        try { Directory.Delete(dir, true); } catch {}
-                    }
-                    AppendLog("Clean purge complete (" + removedCount + " prior files removed).");
+                    if (Directory.Exists(targetDir)) installsToPurge.Add(targetDir);
                 }
-                catch (Exception cex)
+
+                foreach (string dir in installsToPurge)
                 {
-                    AppendLog("[Notice] Partial cleanup note: " + cex.Message);
+                    AppendLog("Purging prior build at: " + FormatCompactPath(dir));
+                    PurgeDirectorySafely(dir);
                 }
+                // Clean up legacy user registry entry if present
+                try { Registry.CurrentUser.DeleteSubKeyTree(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\SpoonbillAIStudio", false); } catch {}
+                AppendLog("Clean purge of prior installation(s) complete.");
             }
 
             if (!Directory.Exists(targetDir))
@@ -2247,21 +2342,57 @@ public class SpoonbillNvidiaInstaller : Form
             if (desktop)
             {
                 string desktopDir = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-                dynamic desktopLink = shell.CreateShortcut(Path.Combine(desktopDir, "Spoonbill AI Studio.lnk"));
-                desktopLink.TargetPath = exePath;
-                desktopLink.WorkingDirectory = targetDir;
-                desktopLink.Description = "Black-Faced Spoonbill AI Studio V4";
-                desktopLink.Save();
+                try
+                {
+                    dynamic desktopLink = shell.CreateShortcut(Path.Combine(desktopDir, "Spoonbill AI Studio.lnk"));
+                    desktopLink.TargetPath = exePath;
+                    desktopLink.WorkingDirectory = targetDir;
+                    desktopLink.Description = "Black-Faced Spoonbill AI Studio V4";
+                    desktopLink.Save();
+                }
+                catch {}
+
+                try
+                {
+                    string commonDesktop = Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory);
+                    if (!string.IsNullOrEmpty(commonDesktop) && Directory.Exists(commonDesktop))
+                    {
+                        dynamic commonLink = shell.CreateShortcut(Path.Combine(commonDesktop, "Spoonbill AI Studio.lnk"));
+                        commonLink.TargetPath = exePath;
+                        commonLink.WorkingDirectory = targetDir;
+                        commonLink.Description = "Black-Faced Spoonbill AI Studio V4";
+                        commonLink.Save();
+                    }
+                }
+                catch {}
             }
 
             if (startMenu)
             {
                 string startMenuDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs");
-                dynamic startMenuLink = shell.CreateShortcut(Path.Combine(startMenuDir, "Spoonbill AI Studio.lnk"));
-                startMenuLink.TargetPath = exePath;
-                startMenuLink.WorkingDirectory = targetDir;
-                startMenuLink.Description = "Black-Faced Spoonbill AI Studio V4";
-                startMenuLink.Save();
+                try
+                {
+                    dynamic startMenuLink = shell.CreateShortcut(Path.Combine(startMenuDir, "Spoonbill AI Studio.lnk"));
+                    startMenuLink.TargetPath = exePath;
+                    startMenuLink.WorkingDirectory = targetDir;
+                    startMenuLink.Description = "Black-Faced Spoonbill AI Studio V4";
+                    startMenuLink.Save();
+                }
+                catch {}
+
+                try
+                {
+                    string commonStart = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu), "Programs");
+                    if (!string.IsNullOrEmpty(commonStart) && Directory.Exists(commonStart))
+                    {
+                        dynamic commonStartLink = shell.CreateShortcut(Path.Combine(commonStart, "Spoonbill AI Studio.lnk"));
+                        commonStartLink.TargetPath = exePath;
+                        commonStartLink.WorkingDirectory = targetDir;
+                        commonStartLink.Description = "Black-Faced Spoonbill AI Studio V4";
+                        commonStartLink.Save();
+                    }
+                }
+                catch {}
             }
         }
         catch {}
@@ -2269,27 +2400,52 @@ public class SpoonbillNvidiaInstaller : Form
 
     private void RegisterUninstaller(string targetDir)
     {
+        string uninstallerExe = Path.Combine(targetDir, "Uninstall.exe");
+        string exePath = Path.Combine(targetDir, "Spoonbill_Studio.exe");
+        string registryPath = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\SpoonbillAIStudio";
+
+        // 1. Machine-wide registration for Control Panel (Programs and Features / appwiz.cpl)
         try
         {
-            string uninstallerExe = Path.Combine(targetDir, "Uninstall.exe");
-            string registryPath = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\SpoonbillAIStudio";
-            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(registryPath))
+            using (RegistryKey key = Registry.LocalMachine.CreateSubKey(registryPath))
             {
                 if (key != null)
                 {
-                    key.SetValue("DisplayName", "Black-Faced Spoonbill AI Studio v4.1");
-                    key.SetValue("DisplayVersion", "4.1.0");
-                    key.SetValue("Publisher", "Black-Faced Spoonbill AI Research Consortium");
-                    key.SetValue("InstallLocation", targetDir);
-                    key.SetValue("UninstallString", "\"" + uninstallerExe + "\"");
-                    key.SetValue("DisplayIcon", Path.Combine(targetDir, "Spoonbill_Studio.exe") + ",0");
-                    key.SetValue("NoModify", 1, RegistryValueKind.DWord);
-                    key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
-                    key.SetValue("EstimatedSize", 480000, RegistryValueKind.DWord);
+                    WriteUninstallRegistryValues(key, targetDir, uninstallerExe, exePath);
                 }
             }
         }
         catch {}
+
+        // 2. Current User registration mirror
+        try
+        {
+            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(registryPath))
+            {
+                if (key != null)
+                {
+                    WriteUninstallRegistryValues(key, targetDir, uninstallerExe, exePath);
+                }
+            }
+        }
+        catch {}
+    }
+
+    private void WriteUninstallRegistryValues(RegistryKey key, string targetDir, string uninstallerExe, string exePath)
+    {
+        key.SetValue("DisplayName", "Black-Faced Spoonbill AI Studio v4.1");
+        key.SetValue("DisplayVersion", "4.1.0");
+        key.SetValue("Publisher", "Black-Faced Spoonbill AI Research Consortium");
+        key.SetValue("InstallLocation", targetDir);
+        key.SetValue("UninstallString", "\"" + uninstallerExe + "\"");
+        key.SetValue("QuietUninstallString", "\"" + uninstallerExe + "\" --quiet");
+        key.SetValue("DisplayIcon", exePath + ",0");
+        key.SetValue("NoModify", 1, RegistryValueKind.DWord);
+        key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
+        key.SetValue("EstimatedSize", 480000, RegistryValueKind.DWord);
+        key.SetValue("InstallDate", DateTime.Now.ToString("yyyyMMdd"));
+        key.SetValue("HelpLink", "https://github.com/Corneliox/BlackFacedSpoonbill");
+        key.SetValue("URLInfoAbout", "https://corneliox.github.io/BlackFacedSpoonbill/");
     }
 
     private string DetectGraphicsCard(out bool hasNvidia)
@@ -2500,17 +2656,56 @@ public class SpoonbillNvidiaInstaller : Form
         }
     }
 
+    private static bool IsAdministrator()
+    {
+        try
+        {
+            using (var identity = WindowsIdentity.GetCurrent())
+            {
+                var principal = new WindowsPrincipal(identity);
+                return principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     [STAThread]
     public static void Main(string[] args)
     {
+        if (args != null && args.Length >= 2 && args[0] == "--verify-ui")
+        {
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            SpoonbillNvidiaInstaller vForm = new SpoonbillNvidiaInstaller();
+            vForm.RunVisualVerification(args[1]);
+            return;
+        }
+
+        if (!IsAdministrator())
+        {
+            try
+            {
+                ProcessStartInfo proc = new ProcessStartInfo();
+                proc.UseShellExecute = true;
+                proc.WorkingDirectory = Environment.CurrentDirectory;
+                proc.FileName = Application.ExecutablePath;
+                if (args != null && args.Length > 0)
+                {
+                    proc.Arguments = string.Join(" ", args);
+                }
+                proc.Verb = "runas";
+                Process.Start(proc);
+                return;
+            }
+            catch {}
+        }
+
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
         SpoonbillNvidiaInstaller form = new SpoonbillNvidiaInstaller();
-        if (args != null && args.Length >= 2 && args[0] == "--verify-ui")
-        {
-            form.RunVisualVerification(args[1]);
-            return;
-        }
         Application.Run(form);
     }
 }

@@ -6,6 +6,8 @@ using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Diagnostics;
 using System.Threading;
+using System.Collections.Generic;
+using System.Security.Principal;
 using Microsoft.Win32;
 
 public class BufferedPanel : Panel
@@ -501,18 +503,29 @@ public class SpoonbillUninstaller : Form
             SetProgress(20);
             KillRunningProcesses();
 
-            AppendLog("Removing Desktop shortcut...");
-            SetProgress(40);
-            string desktopLnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Spoonbill AI Studio.lnk");
-            if (File.Exists(desktopLnk)) { try { File.Delete(desktopLnk); } catch {} }
-
-            AppendLog("Removing Start Menu shortcut...");
-            SetProgress(60);
-            string startMenuLnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs", "Spoonbill AI Studio.lnk");
-            if (File.Exists(startMenuLnk)) { try { File.Delete(startMenuLnk); } catch {} }
+            AppendLog("Removing Desktop and Start Menu shortcuts...");
+            SetProgress(50);
+            string[] lnkDirs = new string[] {
+                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu), "Programs")
+            };
+            foreach (string ld in lnkDirs)
+            {
+                try
+                {
+                    if (Directory.Exists(ld))
+                    {
+                        string p = Path.Combine(ld, "Spoonbill AI Studio.lnk");
+                        if (File.Exists(p)) { File.Delete(p); }
+                    }
+                }
+                catch {}
+            }
 
             AppendLog("Removing Windows Registry uninstaller registration...");
-            SetProgress(80);
+            SetProgress(75);
             RemoveRegistryEntry();
 
             AppendLog("Removing application files from " + targetDir + "...");
@@ -572,34 +585,58 @@ public class SpoonbillUninstaller : Form
 
     private void RemoveRegistryEntry()
     {
-        try
+        string[] keys = new string[] {
+            @"Software\Microsoft\Windows\CurrentVersion\Uninstall\SpoonbillAIStudio",
+            @"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\SpoonbillAIStudio"
+        };
+        foreach (string k in keys)
         {
-            Registry.CurrentUser.DeleteSubKeyTree(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\SpoonbillAIStudio", false);
+            try { Registry.LocalMachine.DeleteSubKeyTree(k, false); } catch {}
+            try { Registry.CurrentUser.DeleteSubKeyTree(k, false); } catch {}
         }
-        catch {}
     }
 
     private void DeleteApplicationDirectory(string dir)
     {
-        if (!Directory.Exists(dir)) return;
+        if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+        {
+            try
+            {
+                string currentExe = Process.GetCurrentProcess().MainModule.FileName;
+                foreach (string file in Directory.GetFiles(dir, "*", SearchOption.AllDirectories))
+                {
+                    if (string.Equals(file, currentExe, StringComparison.OrdinalIgnoreCase)) continue;
+                    try
+                    {
+                        File.SetAttributes(file, FileAttributes.Normal);
+                        File.Delete(file);
+                    }
+                    catch {}
+                }
+
+                ProcessStartInfo psi = new ProcessStartInfo("cmd.exe", "/c ping 127.0.0.1 -n 2 > nul & rd /s /q \"" + dir + "\"");
+                psi.CreateNoWindow = true;
+                psi.UseShellExecute = false;
+                Process.Start(psi);
+            }
+            catch {}
+        }
+
+        // Also clean up any legacy AppData folder so no orphan files remain
         try
         {
-            string currentExe = Process.GetCurrentProcess().MainModule.FileName;
-            foreach (string file in Directory.GetFiles(dir, "*", SearchOption.AllDirectories))
+            string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string[] legacyPaths = new string[] {
+                Path.Combine(localApp, "Programs", "Spoonbill_Studio"),
+                Path.Combine(localApp, "Spoonbill_Studio")
+            };
+            foreach (string lp in legacyPaths)
             {
-                if (string.Equals(file, currentExe, StringComparison.OrdinalIgnoreCase)) continue;
-                try
+                if (Directory.Exists(lp) && !string.Equals(lp, dir, StringComparison.OrdinalIgnoreCase))
                 {
-                    File.SetAttributes(file, FileAttributes.Normal);
-                    File.Delete(file);
+                    try { Directory.Delete(lp, true); } catch {}
                 }
-                catch {}
             }
-
-            ProcessStartInfo psi = new ProcessStartInfo("cmd.exe", "/c ping 127.0.0.1 -n 2 > nul & rd /s /q \"" + dir + "\"");
-            psi.CreateNoWindow = true;
-            psi.UseShellExecute = false;
-            Process.Start(psi);
         }
         catch {}
     }
@@ -641,25 +678,113 @@ public class SpoonbillUninstaller : Form
         this.Close();
     }
 
+    private static bool IsAdministrator()
+    {
+        try
+        {
+            using (var identity = WindowsIdentity.GetCurrent())
+            {
+                var principal = new WindowsPrincipal(identity);
+                return principal.IsInRole(WindowsBuiltInRole.Administrator);
+            }
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static string ResolveInstallDir(string[] args, string currentExe)
+    {
+        if (args != null && args.Length > 0 && Directory.Exists(args[0]))
+        {
+            return args[0];
+        }
+
+        string parentDir = Path.GetDirectoryName(currentExe);
+        if (!string.IsNullOrEmpty(parentDir) && File.Exists(Path.Combine(parentDir, "Spoonbill_Studio.exe")))
+        {
+            return parentDir;
+        }
+
+        string[] regKeys = new string[] {
+            @"Software\Microsoft\Windows\CurrentVersion\Uninstall\SpoonbillAIStudio",
+            @"Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\SpoonbillAIStudio"
+        };
+        foreach (string rk in regKeys)
+        {
+            try
+            {
+                using (RegistryKey k = Registry.LocalMachine.OpenSubKey(rk))
+                {
+                    if (k != null)
+                    {
+                        object loc = k.GetValue("InstallLocation");
+                        if (loc != null && Directory.Exists(loc.ToString())) return loc.ToString();
+                    }
+                }
+            }
+            catch {}
+            try
+            {
+                using (RegistryKey k = Registry.CurrentUser.OpenSubKey(rk))
+                {
+                    if (k != null)
+                    {
+                        object loc = k.GetValue("InstallLocation");
+                        if (loc != null && Directory.Exists(loc.ToString())) return loc.ToString();
+                    }
+                }
+            }
+            catch {}
+        }
+
+        string pf = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Spoonbill_Studio");
+        if (Directory.Exists(pf)) return pf;
+
+        string localApp = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Spoonbill_Studio");
+        if (Directory.Exists(localApp)) return localApp;
+
+        return pf;
+    }
+
     [STAThread]
     public static void Main(string[] args)
     {
-        Application.EnableVisualStyles();
-        Application.SetCompatibleTextRenderingDefault(false);
-
-        string localApp = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        string defaultDir = Path.Combine(localApp, "Programs", "Spoonbill_Studio");
+        string currentExe = Process.GetCurrentProcess().MainModule.FileName;
+        string installDir = ResolveInstallDir(args, currentExe);
 
         if (args != null && args.Length >= 2 && args[0] == "--verify-ui")
         {
-            SpoonbillUninstaller vForm = new SpoonbillUninstaller(defaultDir);
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            SpoonbillUninstaller vForm = new SpoonbillUninstaller(installDir);
             vForm.RunVisualVerification(args[1]);
             return;
         }
 
-        string installDir = (args != null && args.Length > 0 && Directory.Exists(args[0])) ? args[0] : defaultDir;
+        if (!IsAdministrator())
+        {
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo();
+                psi.UseShellExecute = true;
+                psi.WorkingDirectory = Environment.CurrentDirectory;
+                psi.FileName = Application.ExecutablePath;
+                if (args != null && args.Length > 0)
+                {
+                    psi.Arguments = string.Join(" ", args);
+                }
+                psi.Verb = "runas";
+                Process.Start(psi);
+                return;
+            }
+            catch {}
+        }
 
-        string currentExe = Process.GetCurrentProcess().MainModule.FileName;
+        Application.EnableVisualStyles();
+        Application.SetCompatibleTextRenderingDefault(false);
+
         string tempDir = Path.GetTempPath();
         if (currentExe.StartsWith(installDir, StringComparison.OrdinalIgnoreCase))
         {
@@ -668,6 +793,7 @@ public class SpoonbillUninstaller : Form
                 string tempExe = Path.Combine(tempDir, "Spoonbill_Uninstall_" + Guid.NewGuid().ToString("N") + ".exe");
                 File.Copy(currentExe, tempExe, true);
                 ProcessStartInfo psi = new ProcessStartInfo(tempExe, "\"" + installDir + "\"");
+                psi.Verb = "runas";
                 Process.Start(psi);
                 return;
             }
